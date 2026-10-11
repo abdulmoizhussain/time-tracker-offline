@@ -14,6 +14,7 @@ public interface ITimeEntryRepository
     Task UpdateRunningDescriptionAsync(int id, string description, CancellationToken cancellationToken = default);
     Task DeleteEntryAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TimeEntry>> GetRecentEntriesAsync(int take, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TimeEntry>> GetExportEntriesAsync(DateTime? fromUtc, DateTime? toUtcExclusive, CancellationToken cancellationToken = default);
     Task<TimeEntryDateBounds> GetEntryDateBoundsAsync(TimeEntryFilter filter, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TimeEntry>> GetWeekEntriesAsync(TimeEntryFilter filter, DateTime weekStartUtc, DateTime weekEndUtcExclusive,
         TimeEntrySort sort, bool descending, CancellationToken cancellationToken = default);

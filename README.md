@@ -2,6 +2,8 @@
 
 A local-first, offline Windows desktop time-tracking application. It runs from the system tray, stores everything in a local SQLite database, and requires no cloud account.
 
+The author's original requests are preserved in [Author Requirements](docs/AUTHOR_REQUIREMENTS.md), with verbatim statements separated from implementation decisions and assumptions. Contributors and AI agents should consult it when checking feature intent and append new requirements as they are provided.
+
 ---
 
 ## Table of Contents
@@ -51,6 +53,7 @@ TimeTracker/
 ├── publish/release/          # Self-contained published output
 ├── docs/                     # Additional documentation
 │   ├── TODO.md               # Development backlog
+│   ├── AUTHOR_REQUIREMENTS.md # Original author statements and requirement history
 │   ├── TESTING.md            # How to run and extend tests
 │   ├── UI_AUTOMATION.md      # Automation IDs for UI tests
 │   ├── TROUBLESHOOTING.md    # Common issues and fixes
@@ -120,6 +123,15 @@ The app follows a layered MVVM architecture:
 
 ## Features
 
+### Modern desktop UI
+- Input fields use compact vertical padding and shorter minimum heights across the app, with matching manual-entry/filter action buttons and unchanged readable font sizes.
+- A shared light theme uses indigo actions, white surfaces, readable Segoe UI text, consistent controls, and vector Play/Stop icons across the main window, tray popup, and dialogs.
+- The timer stays accessible above the scrollable manual-entry area. Both entry methods remain independent; compact or scaled windows allow scrolling instead of shrinking fields.
+- Description search and sorting stay visible. **Filters** expands date/status controls; its count shows applied conditions. **Changes pending** identifies edits awaiting **Apply**. Week navigation remains accessible outside the filter scroller.
+- The entry table uses compact two-line timestamps, right-aligned full durations, running status labels, and a description column that grows with the window. Metadata remains accessible through horizontal scrolling.
+- Expand **Stored locally · database details** to select/copy the full path. Remove/Clear confirmations share the theme and default to Cancel.
+- The design reference is [UI_PLAN.md](docs/UI_PLAN.md). `tools/UiPreview` renders actual WPF content with isolated sample data for layout review.
+
 ### Usage Guide
 - Open **Help → Usage...** for duration input examples and instructions for manual entries, timers, tray controls, week navigation, filtering, and sorting.
 - The guide is scrollable and resizable, uses the app's UI scaling, and closes with **Close** or Escape.
@@ -127,24 +139,31 @@ The app follows a layered MVVM architecture:
 ### Timer
 - Start/stop a running timer.
 - Live elapsed-time display in the main window title, status bar, taskbar progress, and tray popup.
-- Modify the running timer description from the tray popup.
-- Edit the labeled running-task description in the main window or tray popup, then click **Save** (or press Enter). The timer continues running; blank descriptions use the configured default.
+- The running-description editors have been removed pending the author's replacement interaction design (AR-010).
 - Default timer description is configurable in-app (default: `Untitled task`).
 
 ### Manual Entries
+- Manual duration input is limited to **1 second–24 hours** for the selected date. Malformed, negative, overflowing, or out-of-range components are rejected with an inline message. Start Date is required; start/end times use 24-hour `H:mm` or `HH:mm:ss` with hours 0–23 and minutes/seconds 0–59. End must follow start on the same day; ambiguous/nonexistent clock-change times are rejected. Stop a running entry before changing its duration/date/times.
+- This input limit does not change existing/imported large durations: list cells, elapsed timers, totals, and JSON exports show full hours without wrapping at 24. Import allows durations above 24 hours within the existing integer-seconds storage range and reports skipped invalid/unrepresentable entries.
+- Both rows place a compact Start Date field first, followed by a wider Description field, then duration or time inputs.
 - **Add by duration**: Description, Start Date, and Duration, with its own Add/Save button.
-- **Add by start and end time**: Description, Start Date, Start Time, and End Time, with its own Add Range/Save Range button.
-- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions; selecting an existing entry fills both rows for editing, and **Cancel edit** returns to adding entries.
+- Duration examples, the input limit, and the clickable **Duration help** link appear in parentheses beside **By duration**, rather than on a separate line below the fields.
+- **Add by start and end time**: Description, Start Date, Start Time, and End Time, with its own + Add with Range/Save Range button. Both manual-entry action buttons align with their input fields and match their height.
+- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions. Clicking a list entry selects it without changing either draft; single/double-click entry-edit behavior is deferred pending the author's design.
 - Duration entries are assigned to the selected local date (stored as midnight in `StartUtc`, with no end time); Created/Modified still reflect when the record was saved. The list groups entries by local date.
 - Duration box and start/end time boxes auto-sync on focus loss.
-- Edit existing entries inline by selecting them from the list.
 
 ### Entry List
+- Header column separators are darker and thicker. Entry values are left-aligned except centered ID and Timer cells.
+- Applied filters and sort selections restore on the next launch. Pending selections are preserved separately when closing/exiting, so they still require Apply. Preferences are saved beside the database as `<database path>.view.json`; Reset persists the defaults. A missing/corrupt preferences file falls back to defaults.
+- Running entries are highlighted with an amber background and border, semibold text, and an “In progress” tooltip when visible in the current week/filter. The highlight is removed when the timer stops.
 - Grouped by date with human-readable headers: *Today*, *Yesterday*, weekday names, or full date.
-- Daily total duration shown in each group header.
+- Daily completed duration shown at the left of each group header, immediately beside Today/Yesterday/the date label.
 - Sorted newest-first.
 - **Created** and **Modified** columns show each entry's timestamps in local time (scroll horizontally to see all columns).
 - Start a new timer pre-filled with an existing description.
+- Right-click an entry for **Remove entry** (with confirmation) and, if running, **Stop running entry**. Actions target the clicked row, even if another row is selected.
+- The row's timer button shows **▶** for completed entries and **■** for running entries. Clicking **■** stops that entry and refreshes timer indicators and the current filtered week.
 - **Older week / Newer week** navigation includes a week date range and page count. The default first page is the current week (or the latest week if future-dated entries exist); empty intervening weeks remain navigable.
 - Filter by description text, inclusive local From/To dates, and All/Running/Completed status. Click **Apply** to reload the newest matching week; **Reset** clears filters and restores default sorting. Blank dates impose no date limit. Description searches treat `%` and `_` literally.
 - Sort by Start, Description, Duration, Created, or Modified, ascending or descending. Daily groups stay newest-first; the chosen sort applies **within each day**. Equal values use entry ID as a stable tie-breaker. Filters and sorting persist while navigating or refreshing after changes.
@@ -152,12 +171,16 @@ The app follows a layered MVVM architecture:
 
 ### System Tray
 - Minimize-to-tray on close.
+- **File → Exit completely (including tray)** shuts down the whole app and removes its tray icon; the menu tooltip explains the difference from closing the main window with X.
 - Tray icon turns red while tracking, green while idle.
 - Left-click opens a compact popup with elapsed time and start/stop control.
 - The popup opens beside the clicked tray area on that monitor, stays within its work area, and **Open App** restores the main window.
-- Right-click menu for Open / Exit.
+- Right-click menu for Open / Launch at startup / Exit.
+- Toggle **File → Launch at startup** or the same checked option in the tray right-click menu. Both reflect the current user's Windows Run registration; enabling launches this copy quietly in the tray after sign-in, while normal launches open the main window. Lock/unlock recording continues in the background when enabled in configuration.
+- Registration is opt-in and uses only the `TimeTracker` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`; no administrator access is normally required. Disabling removes only that value. Keep the executable in a stable built/published location; if moving it, disable registration first and enable again from the new location. Windows Startup Apps/Task Manager or organization policy can independently disable startup execution, even while the Run value remains registered.
 
 ### Import / Export
+- Export first offers an optional local date range (inclusive). Leave the option off for all completed entries, or leave an individual boundary blank for an open-ended range. It uses Start date, falling back to End/Created, independently of list filters and pagination. Running entries are excluded. Only then choose the destination directory/filename in the save-file dialog. Exports are not capped to 10,000 records.
 - JSON-based import/export.
 - History of every import/export action is recorded and viewable.
 
@@ -208,6 +231,7 @@ The app follows a layered MVVM architecture:
 | Argument | Description |
 |---|---|
 | `--db-path <path>` | Use an alternative SQLite database file. Overrides the `Storage` configuration. Useful for isolated UI tests. |
+| `--startup` | Start quietly in the tray without showing the main window. Used by Windows startup registration; a duplicate startup launch does not activate the existing instance. |
 
 ---
 

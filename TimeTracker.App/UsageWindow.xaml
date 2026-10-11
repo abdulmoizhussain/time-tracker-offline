@@ -10,19 +10,19 @@
         <Style TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
-        <Style x:Key="SectionHeading" TargetType="TextBlock">
+        <Style x:Key="SectionHeading" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleStyle}">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="0,16,0,6" />
         </Style>
     </Window.Resources>
-    <DockPanel Margin="20">
+    <Border Style="{StaticResource SurfaceStyle}" Margin="16"><DockPanel>
         <Button DockPanel.Dock="Bottom" Content="Close" IsCancel="True"
                 HorizontalAlignment="Right" Padding="20,6" Margin="0,12,0,0"
                 AutomationProperties.AutomationId="CloseUsageButton" Click="OnCloseClick" />
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="0,0,12,0">
-                <TextBlock Text="Using Time Tracker" FontWeight="Bold" />
+                <TextBlock Text="Using TimeTracker" Style="{StaticResource SectionTitleStyle}" FontSize="24" />
                 <TextBlock Text="Duration formats" Style="{StaticResource SectionHeading}" />
                 <TextBlock Text="Whole numbers mean minutes. A decimal point or comma means hours. With two colon-separated parts, use minutes:seconds; with three, use hours:minutes:seconds." Margin="0,0,0,8" />
                 <Grid AutomationProperties.AutomationId="DurationFormatsTable">
@@ -60,17 +60,21 @@
                     <TextBlock Grid.Row="8" Text="2,25" Margin="0,0,24,4" />
                     <TextBlock Grid.Row="8" Grid.Column="1" Text="2 hours, 15 minutes" Margin="0,0,0,4" />
                 </Grid>
-                <TextBlock Text="For example, 1:30 means 1 minute, 30 seconds. For 1 hour, 30 minutes, enter 1:30:00 or 1.5. Empty, invalid, zero, or negative durations cannot be added." Margin="0,8,0,0" />
+                <TextBlock Text="For example, 1:30 means 1 minute, 30 seconds. For 1 hour, 30 minutes, enter 1:30:00 or 1.5. Manual entries must be from 1 second to 24 hours (1440 minutes). Seconds must be 00–59; in hours:minutes:seconds, minutes must also be 00–59. Empty, negative, malformed, and overflowing input is rejected; whole seconds are stored." Margin="0,8,0,0" />
+                <TextBlock Text="Existing and imported entries may contain durations over 24 hours. Their full hours are shown in the list, totals, and exports without wrapping. The manual input limit does not cap or change those stored values." Margin="0,8,0,0" />
                 <TextBlock Text="Manual entries" Style="{StaticResource SectionHeading}" />
                 <TextBlock Text="Add by duration: enter a description, choose a Start Date, and enter the duration. Click Add. The entry belongs to the selected date; no end time is required." />
-                <TextBlock Text="Add by start and end time: enter a description and Start Date, then times such as 09:00 or 09:00:00. The end must be after the start on the same day. Click Add Range. Each row keeps its own draft." Margin="0,8,0,0" />
-                <TextBlock Text="Select an entry to fill the forms for editing, then use Save or Save Range. Cancel edit returns to adding new entries." Margin="0,8,0,0" />
+                <TextBlock Text="Add by start and end time: enter a description and Start Date, then times such as 09:00 or 09:00:00. The end must be after the start on the same day. Click + Add with Range. Each row keeps its own draft." Margin="0,8,0,0" />
+                <TextBlock Text="Clicking an entry selects it without changing your manual-entry drafts. Right-click a row to remove it (after confirmation), or stop it if it is running. The row's ▶ button starts a new timer with that description when no timer is running; ■ stops the running entry." Margin="0,8,0,0" />
                 <TextBlock Text="Timers and the tray" Style="{StaticResource SectionHeading}" />
-                <TextBlock Text="Enter a description and click Start; click Stop when finished. A blank description uses your default timer text, configurable under Edit. To rename an ongoing task, edit Running task description in the main window or tray popup, then click Save or press Enter. The timer keeps running." />
+                <TextBlock Text="Enter a description and click Start; click Stop when finished. A blank description uses your default timer text, configurable under Edit. The previous running-description editors have been removed while a replacement workflow is being designed." />
                 <TextBlock Text="Closing or minimizing the main window hides it to the tray. Click the tray icon for the mini window; Open App restores the main window. Use File → Exit or the tray's Exit command to quit." Margin="0,8,0,0" />
                 <TextBlock Text="Browsing, filtering, and sorting" Style="{StaticResource SectionHeading}" />
-                <TextBlock Text="Older week and Newer week browse Monday–Sunday pages. Choose description, From/To dates (inclusive), or status filters, and a sort field and direction. Click Apply to show the newest matching week. Filters and sorting stay active while you change weeks; Reset restores defaults. Sorting applies within each daily group. Empty weeks remain navigable, and totals reflect matching completed entries." />
+                <TextBlock Text="Applied filter/sort selections restore on your next launch. Pending selections are saved separately on close/exit and still need Apply; Reset saves the defaults." Margin="0,0,0,8" />
+                <TextBlock Text="Older week and Newer week browse Monday–Sunday pages. Description search and sorting stay visible; click Filters for From/To dates (inclusive) and status. The Filters count shows applied conditions. Changes pending means your draft has not been applied yet. Click Apply to show the newest matching week. Filters and sorting stay active while you change weeks; Reset restores defaults. Sorting applies within each daily group. Empty weeks remain navigable, and totals reflect matching completed entries." />
+                <TextBlock Text="Exporting" Style="{StaticResource SectionHeading}" />
+                <TextBlock Text="Import/Export → Export first offers a date range. Leave it off to export all completed entries, or enable it and choose inclusive From/To local dates (either boundary may be blank). Dates use Start, then End or Created when needed. This is independent of the current list filters/week. Continue then opens the save-file dialog to choose the directory and filename. Running entries are excluded." />
             </StackPanel>
         </ScrollViewer>
-    </DockPanel>
+    </DockPanel></Border>
 </Window>

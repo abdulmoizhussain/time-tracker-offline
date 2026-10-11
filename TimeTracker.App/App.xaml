@@ -7,13 +7,20 @@
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles/Theme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
             <system:Double x:Key="UiScaleMultiplier" xmlns:system="clr-namespace:System;assembly=mscorlib">1.0</system:Double>
             <system:Double x:Key="BaseFontSize" xmlns:system="clr-namespace:System;assembly=mscorlib">15</system:Double>
 
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <conv:RunningForegroundConverter x:Key="RunningForegroundConverter" />
+            <conv:ComposerHeightConverter x:Key="ComposerHeightConverter" />
 
             <Style TargetType="Window" x:Key="ScaledWindowStyle">
+                <Setter Property="FontFamily" Value="Segoe UI" />
+                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                <Setter Property="Background" Value="{DynamicResource CanvasBrush}" />
                 <Setter Property="TextElement.FontSize" Value="{DynamicResource BaseFontSize}" />
                 <Setter Property="LayoutTransform">
                     <Setter.Value>
@@ -22,29 +29,10 @@
                 </Setter>
             </Style>
 
-            <Style TargetType="TextBox">
-                <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
-            </Style>
-
-            <Style TargetType="Button">
-                <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
-            </Style>
-
-            <Style TargetType="DatePicker">
-                <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
-            </Style>
-
             <Style TargetType="ListViewItem">
                 <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
             </Style>
 
-            <Style TargetType="GridViewColumnHeader">
-                <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
-            </Style>
-
-            <Style TargetType="MenuItem">
-                <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
-            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

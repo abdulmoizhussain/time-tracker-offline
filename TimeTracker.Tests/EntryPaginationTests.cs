@@ -22,11 +22,46 @@ public sealed class EntryPaginationTests : IDisposable
         File.Delete(_path);
         File.Delete(_path + "-wal");
         File.Delete(_path + "-shm");
+        File.Delete(_path + ".view.json");
+        File.Delete(_path + ".view.json.tmp");
     }
 
     private Task<IReadOnlyList<TimeEntry>> Week(DateTime monday, TimeEntryFilter? filter = null,
         TimeEntrySort sort = TimeEntrySort.Start, bool descending = true)
         => _repository.GetWeekEntriesAsync(filter ?? new(), monday.ToUniversalTime(), monday.AddDays(7).ToUniversalTime(), sort, descending);
+
+    [Fact]
+    public async Task ExportRangeIncludesBothLocalDatesAndLegacyEntriesButExcludesRunning()
+    {
+        var day = DateTime.Today;
+        await _repository.AddDurationEntryAsync("Before", TimeSpan.FromMinutes(1), day.AddDays(-1));
+        await _repository.AddDurationEntryAsync("First", TimeSpan.FromMinutes(1), day);
+        await _repository.AddDurationEntryAsync("Last", TimeSpan.FromMinutes(1), day.AddDays(1));
+        await _repository.AddDurationEntryAsync("After", TimeSpan.FromMinutes(1), day.AddDays(2));
+        await _repository.AddDurationEntryAsync("Legacy", TimeSpan.FromMinutes(1));
+        await _repository.StartTimerAsync("Running", day.ToUniversalTime());
+        var range = await _repository.GetExportEntriesAsync(day.ToUniversalTime(), day.AddDays(2).ToUniversalTime());
+        Assert.Equal(new[] { "First", "Last", "Legacy" }, range.Select(e => e.Description).OrderBy(x => x));
+        Assert.Equal(5, (await _repository.GetExportEntriesAsync(null, null)).Count);
+        Assert.Single(await _repository.GetExportEntriesAsync(null, day.ToUniversalTime()));
+        Assert.Empty(await _repository.GetExportEntriesAsync(day.AddDays(3).ToUniversalTime(), null));
+    }
+
+    [Fact]
+    public async Task ExportIsNotLimitedToTenThousandEntries()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_path}");
+        await connection.OpenAsync();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH RECURSIVE sequence(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM sequence WHERE n<10005)
+            INSERT INTO TimeEntries (Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc)
+            SELECT 'Bulk', @Date, @Date, 1, 0, @Date, @Date FROM sequence;
+            """;
+        command.Parameters.AddWithValue("@Date", DateTime.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync();
+        Assert.Equal(10005, (await _repository.GetExportEntriesAsync(null, null)).Count);
+    }
 
     [Theory]
     [InlineData(15, 15)] // Monday
@@ -155,10 +190,20 @@ public sealed class EntryPaginationTests : IDisposable
                         Microsoft.Extensions.Options.Options.Create(new TimeTracker.Core.Configuration.AppRuntimeOptions()));
                     await vm.InitializeAsync(_path);
                     Assert.Single(vm.Entries);
+                    Assert.False(vm.HasPendingEntryQuery);
+                    Assert.False(vm.HasActiveEntryFilters);
+                    vm.ManualDescription = "Duration draft";
+                    vm.RangeDescription = "Range draft";
+                    vm.SelectedEntry = vm.Entries[0];
+                    Assert.Equal("Duration draft", vm.ManualDescription);
+                    Assert.Equal("Range draft", vm.RangeDescription);
+                    Assert.False(vm.IsEditMode);
                     Assert.False(vm.NewerWeekCommand.CanExecute(null));
                     Assert.True(vm.OlderWeekCommand.CanExecute(null));
                     await vm.OlderWeekCommand.ExecuteAsync(null);
                     Assert.Empty(vm.Entries);
+                    Assert.True(vm.ShowEmptyEntries);
+                    Assert.Equal("No entries this week", vm.EmptyEntriesText);
                     Assert.Contains("Week 2 of 3", vm.WeekPageText);
                     await vm.OlderWeekCommand.ExecuteAsync(null);
                     Assert.Equal(2, vm.Entries.Count);
@@ -167,7 +212,13 @@ public sealed class EntryPaginationTests : IDisposable
                     vm.FilterDescription = "Older";
                     vm.SelectedEntrySort = TimeEntrySort.Duration;
                     vm.SortDescending = false;
+                    Assert.True(vm.HasPendingEntryQuery);
+                    Assert.Equal(0, vm.AppliedFilterCount);
                     await vm.ApplyEntryFiltersCommand.ExecuteAsync(null);
+                    Assert.False(vm.HasPendingEntryQuery);
+                    Assert.Equal(1, vm.AppliedFilterCount);
+                    Assert.True(vm.HasActiveEntryFilters);
+                    Assert.Contains("Filtered completed total", vm.WeekTotalText);
                     Assert.Equal(new[] { "Older short", "Older long" }, vm.Entries.Select(e => e.Description));
                     Assert.Contains("Week 1 of 1", vm.WeekPageText);
                     Assert.Contains("0 h 50 min", vm.EntryPageSummary);
@@ -178,14 +229,75 @@ public sealed class EntryPaginationTests : IDisposable
                     vm.FilterToDate = DateTime.Today.AddDays(-1);
                     await vm.ApplyEntryFiltersCommand.ExecuteAsync(null);
                     Assert.NotEmpty(vm.EntryQueryError);
+                    Assert.True(vm.HasPendingEntryQuery);
+                    Assert.Equal(1, vm.AppliedFilterCount);
                     Assert.Equal(2, vm.Entries.Count);
 
+                    await vm.SaveEntryQueryPreferencesAsync();
+                    var restored = new TimeTracker.App.ViewModels.MainViewModel(_repository, _repository,
+                        Microsoft.Extensions.Options.Options.Create(new TimeTracker.Core.Configuration.AppRuntimeOptions()));
+                    await restored.InitializeAsync(_path);
+                    Assert.Equal("Older", restored.FilterDescription);
+                    Assert.Equal(TimeEntrySort.Duration, restored.SelectedEntrySort);
+                    Assert.False(restored.SortDescending);
+                    Assert.Equal(vm.FilterFromDate, restored.FilterFromDate);
+                    Assert.Equal(vm.FilterToDate, restored.FilterToDate);
+                    Assert.True(restored.HasPendingEntryQuery);
+                    Assert.Equal(new[] { "Older short", "Older long" }, restored.Entries.Select(e => e.Description));
                     await vm.ResetEntryFiltersCommand.ExecuteAsync(null);
+                    await restored.InitializeAsync(_path);
+                    Assert.False(restored.HasActiveEntryFilters);
                     Assert.Equal("Current task", Assert.Single(vm.Entries).Description);
                     Assert.Equal(string.Empty, vm.FilterDescription);
                     Assert.Null(vm.FilterFromDate);
                     Assert.Null(vm.FilterToDate);
                     Assert.Equal(string.Empty, vm.EntryQueryError);
+                    Assert.False(vm.HasPendingEntryQuery);
+                    Assert.Equal(0, vm.AppliedFilterCount);
+
+                    var initialCount = (await _repository.GetEntryDateBoundsAsync(new())).Count;
+                    vm.ManualDuration = "19999980";
+                    await vm.AddDurationEntryCommand.ExecuteAsync(null);
+                    Assert.NotEmpty(vm.ManualDurationError);
+                    vm.ManualDuration = "30";
+                    vm.ManualStartDate = null;
+                    await vm.AddDurationEntryCommand.ExecuteAsync(null);
+                    Assert.Contains("Start Date", vm.ManualDurationError);
+                    vm.ManualStartTime = "09:99";
+                    vm.ManualEndTime = "10:00";
+                    await vm.AddManualRangeEntryCommand.ExecuteAsync(null);
+                    Assert.NotEmpty(vm.ManualRangeError);
+                    vm.ManualStartTime = "10:00";
+                    await vm.AddManualRangeEntryCommand.ExecuteAsync(null);
+                    Assert.Contains("after start", vm.ManualRangeError);
+                    Assert.Equal(initialCount, (await _repository.GetEntryDateBoundsAsync(new())).Count);
+
+                    await _repository.AddDurationEntryAsync("Large legacy entry", TimeSpan.FromSeconds(1199998800), currentMonday);
+                    vm.FilterDescription = "Large legacy";
+                    await vm.ApplyEntryFiltersCommand.ExecuteAsync(null);
+                    Assert.Equal("333333:00:00", Assert.Single(vm.Entries).DurationText);
+                    Assert.Contains("333333 h 0 min", vm.EntryPageSummary);
+                    vm.EditEntryCommand.Execute(vm.Entries[0]);
+                    await vm.AddDurationEntryCommand.ExecuteAsync(null);
+                    Assert.NotEmpty(vm.ManualDurationError);
+                    Assert.Equal(1199998800, Assert.Single(await _repository.GetWeekEntriesAsync(
+                        new TimeEntryFilter { Description = "Large legacy" }, currentMonday.ToUniversalTime(), currentMonday.AddDays(7).ToUniversalTime(), TimeEntrySort.Start, true)).DurationSeconds);
+                    vm.CancelEditCommand.Execute(null);
+                    await vm.ResetEntryFiltersCommand.ExecuteAsync(null);
+                    vm.TimerDescription = "Context timer";
+                    await vm.StartTimerCommand.ExecuteAsync(null);
+                    var runningRow = vm.Entries.Single(e => e.IsRunning);
+                    var completedRow = vm.Entries.First(e => !e.IsRunning);
+                    vm.ManualDescription = "Keep this draft";
+                    vm.SelectedEntry = completedRow;
+                    Assert.True(vm.StopEntryCommand.CanExecute(runningRow));
+                    Assert.False(vm.StopEntryCommand.CanExecute(completedRow));
+                    await vm.StopEntryCommand.ExecuteAsync(runningRow);
+                    Assert.False(vm.IsTimerRunning);
+                    Assert.Equal("Time Tracker", vm.WindowTitle);
+                    Assert.Equal(System.Windows.Shell.TaskbarItemProgressState.None, vm.TaskbarProgressState);
+                    Assert.Null(await _repository.GetRunningEntryAsync());
+                    Assert.Equal("Keep this draft", vm.ManualDescription);
                     completion.SetResult();
                 }
                 catch (Exception ex)

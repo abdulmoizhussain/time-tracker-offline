@@ -8,9 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using TimeTracker.App.ViewModels;
+using TimeTracker.App.Helpers;
 using TimeTracker.Core.Configuration;
 using TimeTracker.Core.Contracts;
 using TimeTracker.Data;
+using SystemColors = System.Windows.SystemColors;
 
 namespace TimeTracker.App;
 
@@ -27,12 +29,55 @@ public partial class App : System.Windows.Application
 
     public App()
     {
+        SystemParameters.StaticPropertyChanged += OnSystemAppearanceChanged;
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnCurrentDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
     }
 
     public static IServiceProvider Services { get; private set; } = null!;
+
+    private void OnSystemAppearanceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SystemParameters.HighContrast))
+        {
+            Dispatcher.Invoke(ApplyHighContrastColors);
+        }
+    }
+
+    internal void ApplyHighContrastColors()
+    {
+        // Override the semantic palette, leaving native controls to Windows' own theme.
+        var colors = new Dictionary<string, System.Windows.Media.Brush>
+        {
+            ["CanvasBrush"] = SystemColors.WindowBrush,
+            ["SurfaceBrush"] = SystemColors.WindowBrush,
+            ["TextBrush"] = SystemColors.WindowTextBrush,
+            ["MutedBrush"] = SystemColors.WindowTextBrush,
+            ["LineBrush"] = SystemColors.WindowTextBrush,
+            ["HeaderSeparatorBrush"] = SystemColors.WindowTextBrush,
+            ["AccentBrush"] = SystemColors.HighlightBrush,
+            ["AccentTextBrush"] = SystemColors.HighlightTextBrush,
+            ["HoverBrush"] = SystemColors.ControlBrush,
+            ["SelectedBrush"] = SystemColors.HighlightBrush,
+            ["SelectedTextBrush"] = SystemColors.HighlightTextBrush,
+            ["RunningBrush"] = SystemColors.WindowBrush,
+            ["RunningTextBrush"] = SystemColors.WindowTextBrush,
+            ["RunningBorderBrush"] = SystemColors.WindowTextBrush,
+            ["DangerBrush"] = SystemColors.HighlightBrush
+        };
+        foreach (var (key, brush) in colors)
+        {
+            if (SystemParameters.HighContrast)
+            {
+                Resources[key] = brush;
+            }
+            else
+            {
+                Resources.Remove(key);
+            }
+        }
+    }
 
     private async void OnApplicationStartup(object sender, StartupEventArgs e)
     {
@@ -46,8 +91,11 @@ public partial class App : System.Windows.Application
         {
             try
             {
-                using var existingEvent = EventWaitHandle.OpenExisting(eventName);
-                existingEvent.Set();
+                if (!WindowsStartupRegistration.IsStartupLaunch(e.Args))
+                {
+                    using var existingEvent = EventWaitHandle.OpenExisting(eventName);
+                    existingEvent.Set();
+                }
             }
             catch
             {
@@ -77,6 +125,7 @@ public partial class App : System.Windows.Application
         configuration.Bind(runtimeOptions);
 
         ApplyUiScaling(runtimeOptions);
+        ApplyHighContrastColors();
 
         var databaseDirectory = runtimeOptions.Storage.DatabaseDirectory;
         var databaseFileName = runtimeOptions.Storage.DatabaseFileName;
@@ -144,13 +193,18 @@ public partial class App : System.Windows.Application
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
-        mainWindow.Show();
+        mainWindow.InitializeForLaunch(WindowsStartupRegistration.IsStartupLaunch(e.Args));
     }
 
     private void OnActivateRequested(object? state, bool timedOut)
     {
         Dispatcher.Invoke(() =>
         {
+            if (MainWindow is TimeTracker.App.MainWindow mainWindow)
+            {
+                mainWindow.ShowAndActivate();
+                return;
+            }
             if (MainWindow is { IsVisible: false } window)
             {
                 window.Show();
@@ -163,6 +217,7 @@ public partial class App : System.Windows.Application
 
     private async void OnExit(object sender, ExitEventArgs e)
     {
+        SystemParameters.StaticPropertyChanged -= OnSystemAppearanceChanged;
         _activateWaitHandle?.Unregister(null);
         _activateEvent?.Dispose();
 

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 using TimeTracker.App.ViewModels;
+using TimeTracker.Core.Models;
 
 namespace TimeTracker.App.Converters;
 
@@ -16,11 +17,11 @@ public sealed class EntryGroupHeaderConverter : IValueConverter, IMultiValueConv
 
         var dateLabel = new DateGroupLabelConverter().Convert(group.Name, typeof(string), null!, culture) as string ?? string.Empty;
         var totalSeconds = group.Items.OfType<TimeEntryViewModel>().Where(e => !e.IsRunning).Sum(e => (long)e.DurationSeconds);
-        var duration = TimeSpan.FromSeconds(totalSeconds);
-        var hours = (long)duration.TotalHours;
-        var minutes = duration.Minutes;
-
-        return $"{dateLabel}   {hours} h {minutes} min";
+        if (parameter is "Total")
+        {
+            return $"Completed: {DurationFormatter.HoursMinutes(totalSeconds)}";
+        }
+        return $"{dateLabel}   {DurationFormatter.HoursMinutes(totalSeconds)}";
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

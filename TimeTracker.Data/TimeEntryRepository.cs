@@ -149,7 +149,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
         const string selectSql = """
             SELECT Id, Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc
             FROM TimeEntries
-            WHERE Id = @Id;
+            WHERE Id = @Id AND IsRunning = 1;
             """;
 
         const string updateSql = """
@@ -158,7 +158,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
                 DurationSeconds = @DurationSeconds,
                 IsRunning = 0,
                 UpdatedUtc = @UpdatedUtc
-            WHERE Id = @Id;
+            WHERE Id = @Id AND IsRunning = 1;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -212,7 +212,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             Description = description,
             StartUtc = startUtc.HasValue ? ToUtcString(startUtc.Value) : (string?)null,
             EndUtc = (string?)null,
-            DurationSeconds = (int)duration.TotalSeconds,
+            DurationSeconds = checked((int)duration.TotalSeconds),
             IsRunning = 0,
             CreatedUtc = ToUtcString(now),
             UpdatedUtc = ToUtcString(now)
@@ -362,6 +362,18 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             new CommandDefinition(selectSql + "\n" + EntryFilterSql, FilterParameters(filter), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return new TimeEntryDateBounds(bounds.FirstUtc is null ? null : ParseUtc(bounds.FirstUtc),
             bounds.LastUtc is null ? null : ParseUtc(bounds.LastUtc), bounds.Count);
+    }
+
+    public async Task<IReadOnlyList<TimeEntry>> GetExportEntriesAsync(DateTime? fromUtc, DateTime? toUtcExclusive, CancellationToken cancellationToken = default)
+    {
+        const string selectSql = "SELECT Id, Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc FROM TimeEntries ";
+        const string orderSql = " ORDER BY COALESCE(StartUtc, EndUtc, CreatedUtc) DESC, Id DESC;";
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var entries = await connection.QueryAsync<TimeEntryDto>(new CommandDefinition(selectSql + EntryFilterSql + orderSql,
+            FilterParameters(new TimeEntryFilter { FromUtc = fromUtc, ToUtcExclusive = toUtcExclusive, IsRunning = false }),
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return entries.Select(ToModel).ToList();
     }
 
     public async Task<IReadOnlyList<TimeEntry>> GetWeekEntriesAsync(TimeEntryFilter filter, DateTime weekStartUtc,

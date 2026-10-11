@@ -2,24 +2,24 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Default Timer Text"
-        Height="190"
+        Height="240"
         Width="520"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize" MinWidth="420" MinHeight="220"
         WindowStartupLocation="CenterOwner"
         Style="{StaticResource ScaledWindowStyle}">
-    <Grid Margin="20">
+    <Border Style="{StaticResource SurfaceStyle}" Margin="16"><Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Default timer description:" />
-        <TextBox Grid.Row="1" Text="{Binding DefaultTimerDescription, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" Padding="6,4" />
+        <TextBlock Grid.Row="0" Text="Default timer description" Style="{StaticResource SectionTitleStyle}" />
+        <TextBox Grid.Row="1" Text="{Binding DefaultTimerDescription, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" Padding="6,2" />
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-            <Button Content="Save" Padding="20,6" Click="OnSaveClick" />
+            <Button Content="Save" Style="{StaticResource PrimaryButtonStyle}" Padding="20,6" Click="OnSaveClick" />
             <Button Content="Close" Padding="20,6" Margin="8,0,0,0" Click="OnCloseClick" />
         </StackPanel>
-    </Grid>
+    </Grid></Border>
 </Window>

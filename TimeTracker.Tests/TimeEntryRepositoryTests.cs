@@ -62,6 +62,20 @@ public sealed class TimeEntryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task StopTimerAsync_RepeatedStopDoesNotChangeCompletedEntry()
+    {
+        var start = DateTime.UtcNow.AddMinutes(-5);
+        var id = await _repository.StartTimerAsync("Task", start);
+        await _repository.StopTimerAsync(id, start.AddMinutes(5));
+        var first = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        await _repository.StopTimerAsync(id, start.AddHours(1));
+        var second = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.Equal(first.EndUtc, second.EndUtc);
+        Assert.Equal(first.DurationSeconds, second.DurationSeconds);
+        Assert.Equal(first.UpdatedUtc, second.UpdatedUtc);
+    }
+
+    [Fact]
     public async Task AddDurationEntryAsync_CreatesEntry()
     {
         var id = await _repository.AddDurationEntryAsync("Manual entry", TimeSpan.FromMinutes(45));

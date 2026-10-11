@@ -1,0 +1,345 @@
+# Author Requirements
+
+This document preserves the author's original requirements for TimeTracker so the author, contributors, and AI agents can check what was actually requested. Quoted text is the author's wording, including spelling, punctuation, and informal phrasing. Context and implementation notes are explicitly separate from those quotes.
+
+## Source and scope
+
+Initial record created on **2026-10-11 (Asia/Karachi)** from the messages available in the current development conversation, in their original order. Individual message timestamps are unavailable; this is the recording date, not a claimed timestamp for every request.
+
+This record covers the feature requests and relevant diagnostic/clarification context available in that conversation. It does **not** claim to recover all requirements from the project's original creation. Earlier backlog/specification material remains in [TODO.md](TODO.md) and [SPEC.md](SPEC.md); do not present that material as verbatim author statements without its original source.
+
+The quotes record intent, not proof that a feature works. [README.md](../README.md) describes current behavior, [TODO.md](TODO.md) tracks work, and the code/tests establish implementation. Later explicit author corrections take precedence; preserve earlier quotes and link the correction rather than rewriting history.
+
+## Requirements index
+
+| ID | Subject |
+|---|---|
+| [AR-001](#ar-001--entry-timestamps-tray-popup-and-running-description) | Entry timestamps, tray placement/Open App, running description |
+| [AR-002](#ar-002--separate-manual-entry-rows) | Separate duration and start/end manual-entry rows |
+| [AR-003](#ar-003--pagination-filtering-and-sorting) | Pagination with custom filters and sorting |
+| [AR-004](#ar-004--help--usage-window) | Usage window under Help, including duration formats |
+| [AR-005](#ar-005--highlight-the-running-entry) | Highlight the in-progress row |
+| [AR-006](#ar-006--manual-entry-field-order-and-width) | Narrow Start Date at left; Description in the middle |
+| [AR-007](#ar-007--investigate-the-extreme-week-total) | Investigate the 367233-hour total |
+| [AR-008](#ar-008--strict-input-validation-with-unrestricted-large-duration-display) | Strict UI validation; preserve large-duration calculations/display |
+| [AR-009](#ar-009--maintain-the-authors-original-requirements) | Maintain this requirements record |
+| [AR-010](#ar-010--entry-context-actions-and-revert-clickediting-behavior) | Entry context actions, stop icon, and revert description/click editors |
+| [AR-011](#ar-011--modern-ui-plan-before-implementation) | Modern UI plan for author review before implementation |
+| [AR-012](#ar-012--implement-the-ui-plan) | Approval to implement the UI plan |
+| [AR-013](#ar-013--table-alignment-persistent-queries-export-range-and-startup-option) | Table alignment, persistent queries, export range, and startup-option explanation |
+| [AR-014](#ar-014--compact-input-fields) | Reduce input-field vertical padding |
+
+## AR-001 — Entry timestamps, tray popup, and running description
+
+Later correction: AR-010 withdraws the implemented running-description editors; the replacement design is deferred. Other parts of this request remain in scope.
+
+Author's original request:
+
+```text
+ok lets start with these tasks,
+we need to do these:
+- need to show `Created` & `Modified` columns in the list view.
+- the mini window that opens from the tray icon is getting opened in the mid of the screen. it should open right on the tray icon are (near bottom right)
+- the `Open App` of the mini window is not opening the main application.
+- I should be able to modify an ongoing task's description intuitively.
+```
+
+Implementation notes (agent decisions, not quoted requirements): local-time timestamp display; monitor/DPI-aware popup placement; explicit Save/Enter description editors in the main window and tray popup. The author did not prescribe the editor's exact controls or colors.
+
+## AR-002 — Separate manual-entry rows
+
+Later correction: AR-010 removes clicking-to-populate forms. The two manual-entry rows remain.
+
+Author's original request:
+
+```text
+we now need to split the manual entry options into 2 rows. because adding by duration && adding by start time and end time are two different things i believe. right? both the rows should have the Description && Start Date options.
+```
+
+Implementation notes (agent decisions): independent drafts and save actions for the two rows; the duration row's selected date is persisted. AR-006 subsequently refines the field order and widths.
+
+## AR-003 — Pagination, filtering, and sorting
+
+Author's preceding question (context):
+
+```text
+the list view has pagination right?
+```
+
+Conversation context (not an author quote): the agent explained that the list loaded only the latest 500 entries and that Monday–Sunday week pagination was an open backlog item.
+
+Author's original request:
+
+```text
+lets build this pagination thing.
+also with the filter and sorting options, so that we can repopulate the listview with custom filter and sorting options in  the same paginated way.
+```
+
+Implementation notes (agent decisions): Monday–Sunday pages; description/date/status filters; sorting by Start, Description, Duration, Created, or Modified; Apply/Reset controls; filters/sorting retained during week navigation. Sorting within daily groups, inclusive date bounds, and keeping empty calendar weeks navigable were agent choices, not explicitly specified in the quoted request. The weekly calendar convention came from the existing backlog and preceding conversation context.
+
+## AR-004 — Help → Usage window
+
+Author's preceding question (context):
+
+```text
+pls remind me , what are the accepted formats of the Duration field?
+```
+
+Conversation context (not an author quote): the response listed `34`, `33:33`, `33:`, `:33`, `1:02:30`, `1.5`, and `5.3`, explaining minutes, minutes:seconds, hours:minutes:seconds, and decimal hours.
+
+Author's original request:
+
+```text
+can we add this in some kind of Usage window?
+inside Help button of the File bar.
+```
+
+Implementation notes (agent decisions): Help → Usage... opens a scrollable, resizable guide. Instructions for other app workflows were added alongside the duration examples. AR-008 subsequently adds validation guidance.
+
+## AR-005 — Highlight the running entry
+
+Author's original request:
+
+```text
+we now need to highlight the row that is currently in progress. if present in the listview.
+```
+
+Implementation notes (agent decisions): highlight uses `IsRunning`, an amber background/border, semibold text, and an “In progress” tooltip/accessibility status. Selected rows retain the running border. The author did not specify a color or ask for filters/pages to be changed to reveal the running row.
+
+## AR-006 — Manual-entry field order and width
+
+Author's original request:
+
+```text
+shift the Start Date box on the left most side, and make its width a little shorter. and put the description box on its right i.e. in the middle. 
+for both the manual entry rows
+```
+
+Relationship: refines AR-002. Implementation uses a shared narrower date column and wider description column; the author did not prescribe an exact pixel width.
+
+## AR-007 — Investigate the extreme week total
+
+Author's original diagnostic request:
+
+```text
+how is this possible?
+367233 hours?
+you can access the .db file in the bin folder and validate the code as well how are we calculating the total hours?
+```
+
+Attachment context: the screenshot displayed “11 entries this week · 11 matching entries overall · Week total: 367233 h 11 min (completed entries)”. The screenshot is diagnostic evidence, not an additional instruction. Its original temporary attachment path is not a permanent project artifact.
+
+Investigation findings (agent observations, not author requirements): the Debug database's 11 completed entries summed to 1,322,039,478 seconds; entries 8, 7, and 5 contained 333,333 hours, 33,333 hours, and 555 hours 33 minutes respectively. The total matched stored data. The row formatter used `TimeSpan.Hours`, hiding whole days by wrapping the displayed hours every 24 hours. The database does not retain the original duration input, so what was originally typed could not be established.
+
+These are observations at investigation time, not a claim about the database's future contents. This diagnostic request did not authorize changing or deleting records.
+
+## AR-008 — Strict input validation with unrestricted large-duration display
+
+Author's original request:
+
+```text
+ok so we have to apply very restrictive validations on the UI level. but we dont have to block these kind of scenarios while the calculation. let the UI show any kind of large durations. handle the scenarios as well
+```
+
+Relationship: follows AR-007 and clarifies the distinction between input validation and calculation/display behavior.
+
+Implementation notes (agent decisions, not explicit author limits):
+
+- The **1 second–24 hours** manual-duration limit was chosen and announced by the agent. The author requested restrictive validation but did **not** specify that numeric limit.
+- Strict time components, required dates, inline errors, overflow handling, and protection against changing a running timer's dates/times were implementation choices.
+- Existing large durations are retained; rows, running elapsed time, totals, and exports show full hours without 24-hour wrapping. Totals are not capped to the manual-input limit.
+- Imported durations can exceed the manual-input limit within the existing signed 32-bit per-entry seconds storage range. That range is an implementation constraint, not a user-requested business limit. Aggregate formatting supports signed 64-bit seconds without relying on `TimeSpan`'s range.
+- No production database values were changed to make the total smaller.
+
+Do not mistake the chosen 24-hour limit, storage type, or specific validation messages for verbatim author requirements. Revisit those choices if the author changes or clarifies the requirement.
+
+## AR-009 — Maintain the author's original requirements
+
+Author's original request:
+
+```text
+lets start maintaining a `author requirements` documents, where we need to keep the requirements maintained. we should keep my near-exact statements in there, so that I can and any other AI agent can go back check the actual/exact requirements that were originally provided while the tool creation.
+```
+
+Implementation notes (agent decisions): this document, stable AR identifiers, verbatim quotes from the available conversation, explicit separation of context/assumptions from author statements, and links from README/AGENTS.
+
+## AR-010 — Entry context actions and revert click/editing behavior
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+the right click on a listview entry should show & perform these actions:
+
+- remove an entry.
+- stop a running, if it is currently in running/in-progess.
+
+
+
+need to do some other things as well.
+
+- the feature you have provided for modifying the descripton of an ongoing task is not very much intuitive. lets revert that. i will explain myself later in what way to do this.
+- currently when i click on a task in the list view it sends that description to the manual entry boxes. lets not do that as well. may be the previous AI developed it that way. I will explain later what to do on single clicks on a list view item.
+- the play button icon does not show stop icon on an ongoing task in the listview.
+```
+
+Relationship: supersedes the current running-description editor chosen for AR-001 and the click-to-edit implementation associated with AR-002. It does not remove the two manual-entry rows. The author explicitly defers the replacement description-editing and single-click interaction designs.
+
+Implementation notes (agent choices): context actions target the right-clicked row independently of selection; removal retains confirmation; Stop is shown only for running rows. A running row's button shows ■ and stops that entry. Both description editors and single/double-click form population are removed. Ordinary selection remains, without changing manual drafts. Existing internal edit/repository methods are retained for future design work but are not exposed through row clicks.
+
+## AR-011 — Modern UI plan before implementation
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+can you please create an improved UI plan for this tool? that looks good and catchy.
+because this app has features but the looks are not really modern.
+a little modern look make it feel good to use as well.
+so just create a plan for first, I will tell you where to make amendents in the plan
+```
+
+Context (agent notes): [UI_PLAN.md](UI_PLAN.md) is a draft proposal for review. Colors, layout, filter-panel placement, and implementation phases are agent suggestions, not approved author requirements. This request authorizes planning only; the application's UI is not changed. AR-002/006's two manual rows and field order, and AR-010's deferred editing interactions, remain relevant constraints.
+
+## AR-012 — Implement the UI plan
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+pls now implement the UI_PLAN.md
+```
+
+Relationship: approves implementation of the draft created for AR-011. The original AR-011 planning-only request remains unchanged as history. Implementation follows [UI_PLAN.md](UI_PLAN.md), preserving the two independent manual rows, narrow leftmost dates, and the deferred editing interactions of AR-010.
+
+Implementation notes (agent choices): shared WPF theme resources; scrollable composer/filter controls at constrained sizes; persistent timer and week navigation; applied-filter counts and draft feedback; compact timestamps; matching destructive confirmation windows; isolated WPF preview helper. No new task-description editing interaction is introduced.
+
+## AR-013 — Table alignment, persistent queries, export range, and startup option
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- the column separator of the header row should have more bold separator color.
+- the values of every row should be left aligned, currently they are center aligned. except only for the ID & Timer columns.
+- the selected filter & sorting values should be persisting. on get remapped on next app start.
+- Export option should give the date range option as well (as an optional thing) before asking to select the export directory.
+
+
+
+After implementing all the above points, let me know, how can we provide an option to register this app as an startup application?
+```
+
+Relationship: refines AR-012; supersedes the UI plan's right-aligned duration cells. Startup registration is requested as an explanation, not an instruction to register or implement it now.
+
+Implementation notes (agent decisions): darker two-unit header separators retain resizing; ID/Timer remain centered. Query preferences live beside each database in a `.view.json` file, preserving applied results and pending drafts separately; Apply/Reset and normal close/exit save them. Export's optional inclusive local-date range uses Start, then End, then Created, independent of list filters, excludes running entries, and has no former 10,000-record cap. The save-file dialog still chooses the directory and filename after range selection.
+
+## AR-014 — Compact input fields
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+reduce the vertical paddings of all the input fields because the fields are taking quite much screen area of the app.
+```
+
+Implementation notes (agent choices): shared text fields and dropdowns use two-unit vertical padding and a 28-unit minimum height instead of 34. Date inputs also use compact internal text padding. Adjacent manual/filter action controls match the shorter fields. Font sizes and existing UI scaling are retained. Applies across main and secondary windows.
+
+## AR-015 — Windows startup registration in File and tray menus
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author messages in the current development conversation.
+
+Author's preceding questions and implementation constraint (verbatim):
+
+```text
+ok about the start minimized to tray thing. when the app starts on the windows startup, will it be able to detect the windows lock/unlock events as well by being in the tray background?
+also: adding & removing the current user's windows run registry key would require the admin access for the app or not?
+
+DO NOT IMPLEMENT IT YET.
+```
+
+Author's subsequent authorization (verbatim):
+
+```text
+perfect. lets implement the changes now.
+
+The launch at startup option should be in both the places:
+
+- The File option.
+- and the Tray icon right click menu as well.
+```
+
+Relationship: authorizes the startup implementation discussed in AR-013 and supersedes the preceding instruction to defer implementation.
+
+Implementation notes (agent decisions): synchronized checkable menus read/write only the current user's `TimeTracker` Run value. Registration is opt-in and points to the built/published executable with `--startup`. Such launches initialize the tray without showing the main window, retaining the existing session-event subscription and configured recording. Normal launches still show/activate the app; duplicate startup launches do not bring it forward. Errors are surfaced and registry state is re-read. Moving the executable requires re-registration. Windows-level disabling/policy remains outside the app's registration toggle.
+
+## AR-016 — Manual action alignment and left-side daily totals
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- rename the button label `Add Range` to `+ Add with Range`
+- and also correct the vertical alignment of this button and aldo the `+ Add` button.
+- move the calculated hours info `Completed: 567 h 25 min` on left most side, exactly beside TOday/Yesterday text.
+```
+
+Implementation notes (agent decisions): keep Save/Save Range labels in edit mode. Both action buttons use the same label-space layout as adjacent fields and match the text input height. Daily totals sit immediately after the date label at the left; calculation and formatting are unchanged.
+
+## AR-017 — Clarify that File Exit completely closes the app
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+The File>Exit button should clearly mention that this Exit button is going to completely close the app, it will kill the app, even close it from the tray icon.
+```
+
+Implementation notes (agent decisions): label File's action “Exit completely (including tray)” and add tooltip/accessibility text explaining full shutdown versus the window's X hiding to the tray. Preserve the existing graceful shutdown action; no forced process termination or new confirmation dialog.
+
+## AR-018 — Inline duration hints in the section heading
+
+Recorded: 2026-10-11 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+move the line `34 = minutes . 1.5 = hours . 1 second-24 hours. duration help` into the brackets of this section's heading i.e. By duration (move here)
+```
+
+Implementation notes (agent decisions): place the existing hints and clickable Duration help link in parentheses immediately after By duration. Remove the separate hint line, retain muted styling for the hints, and allow the heading to wrap when space is limited.
+
+## Maintenance rules
+
+1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
+2. Copy the author's actual message verbatim whenever available. Preserve typos and informal language. If text is shortened, paraphrased, or reconstructed, label it **near-exact**, **excerpt**, or **summary** and state the reason. Never manufacture an exact quote from code, an agent reply, or a backlog item.
+3. Keep original quotes immutable. For later corrections, add a new entry and cross-link it to the earlier entry, marking the affected part superseded where appropriate. Do not silently replace the original request.
+4. Put inferred scope, numeric limits, UI choices, and implementation constraints under clearly labeled context/implementation notes. Do not turn agent assumptions into author statements.
+5. Keep work status in TODO/CHANGELOG and current behavior in README/SPEC. Reference AR IDs from related documentation when useful; the quote itself must not change with implementation status.
+6. Do not copy secrets or personal data into a tracked document. If a requirement includes sensitive content, redact that part explicitly rather than calling the redacted quote verbatim.
+7. Treat this as a historical requirements reference. Current explicit author instructions and applicable repository rules govern the present task; old quotes do not independently authorize unrelated operations or data changes.
+
+### Entry template
+
+```markdown
+## AR-019 — Short subject
+
+Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
+
+Author's original request (verbatim / near-exact / excerpt; state which):
+
+> Copy the author's wording here.
+
+Context (not an author quote): ...
+
+Relationship: refines/supersedes AR-... (if applicable).
+
+Implementation notes (agent decisions, not original requirements): ...
+```

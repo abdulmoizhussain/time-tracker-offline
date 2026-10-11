@@ -32,6 +32,41 @@ public sealed partial class MainViewModel : ObservableObject
     private DateTime _oldestWeek = EntryWeek.Start(DateTime.Today);
     private DateTime _newestWeek = EntryWeek.Start(DateTime.Today);
     private CancellationTokenSource? _entriesLoadCancellation;
+    private string? _entryPreferencesPath;
+    private readonly SemaphoreSlim _preferencesGate = new(1, 1);
+
+    [ObservableProperty]
+    private string _entryPreferencesError = string.Empty;
+
+    [ObservableProperty]
+    private bool _isFiltersExpanded;
+
+    [ObservableProperty]
+    private string _weekTotalText = "Completed this week: 0 h 0 min";
+
+    [ObservableProperty]
+    private string _emptyEntriesText = "No entries this week";
+
+    public bool HasActiveEntryFilters => _activeFilter.IsActive;
+    public string FiltersButtonText => $"Filters · {AppliedFilterCount}";
+    public int AppliedFilterCount => (string.IsNullOrWhiteSpace(_activeFilter.Description) ? 0 : 1)
+        + (_activeFilter.FromUtc.HasValue ? 1 : 0) + (_activeFilter.ToUtcExclusive.HasValue ? 1 : 0)
+        + (_activeFilter.IsRunning.HasValue ? 1 : 0);
+    public bool ShowEmptyEntries => !IsEntriesLoading && Entries.Count == 0 && string.IsNullOrEmpty(EntryQueryError);
+    public bool HasPendingEntryQuery => FilterDescription.Trim() != _activeFilter.Description
+        || FilterFromDate?.Date.ToUniversalTime() != _activeFilter.FromUtc
+        || FilterToDate?.Date != _activeFilter.ToUtcExclusive?.ToLocalTime().Date.AddDays(-1)
+        || (FilterStatus == "Running" ? true : FilterStatus == "Completed" ? false : (bool?)null) != _activeFilter.IsRunning
+        || SelectedEntrySort != _activeSort || SortDescending != _activeDescending;
+
+    private void NotifyEntryQueryState()
+    {
+        OnPropertyChanged(nameof(HasPendingEntryQuery));
+        OnPropertyChanged(nameof(HasActiveEntryFilters));
+        OnPropertyChanged(nameof(FiltersButtonText));
+        OnPropertyChanged(nameof(AppliedFilterCount));
+        OnPropertyChanged(nameof(ShowEmptyEntries));
+    }
 
     public IReadOnlyList<string> StatusFilters { get; } = new[] { "All", "Running", "Completed" };
     public IReadOnlyList<TimeEntrySort> EntrySortOptions { get; } = Enum.GetValues<TimeEntrySort>();
@@ -80,6 +115,7 @@ public sealed partial class MainViewModel : ObservableObject
         };
 
         Entries = new ObservableCollection<TimeEntryViewModel>();
+        Entries.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowEmptyEntries));
         TimerSuggestions = new ObservableCollection<string>();
         ManualSuggestions = new ObservableCollection<string>();
         RangeSuggestions = new ObservableCollection<string>();
@@ -88,6 +124,15 @@ public sealed partial class MainViewModel : ObservableObject
 
         PropertyChanged += (sender, e) =>
         {
+            if (e.PropertyName is nameof(FilterDescription) or nameof(FilterFromDate) or nameof(FilterToDate)
+                or nameof(FilterStatus) or nameof(SelectedEntrySort) or nameof(SortDescending))
+            {
+                OnPropertyChanged(nameof(HasPendingEntryQuery));
+            }
+            if (e.PropertyName is nameof(IsEntriesLoading) or nameof(EntryQueryError))
+            {
+                OnPropertyChanged(nameof(ShowEmptyEntries));
+            }
             if (e.PropertyName == nameof(TimerDescription))
             {
                 _ = UpdateTimerSuggestionsAsync();
@@ -107,16 +152,19 @@ public sealed partial class MainViewModel : ObservableObject
     private string _timerDescription = string.Empty;
 
     [ObservableProperty]
-    private string _runningDescription = string.Empty;
-
-    [ObservableProperty]
     private string _manualDescription = string.Empty;
 
     [ObservableProperty]
     private string _rangeDescription = string.Empty;
 
     [ObservableProperty]
-    private DateTime _rangeStartDate = DateTime.Today;
+    private DateTime? _rangeStartDate = DateTime.Today;
+
+    [ObservableProperty]
+    private string _manualDurationError = string.Empty;
+
+    [ObservableProperty]
+    private string _manualRangeError = string.Empty;
 
     [ObservableProperty]
     private ObservableCollection<string> _rangeSuggestions;
@@ -124,7 +172,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isRangeSuggestionsOpen;
 
-    public string RangeButtonText => IsEditMode ? "Save Range" : "Add Range";
+    public string RangeButtonText => IsEditMode ? "Save Range" : "+ Add with Range";
 
     partial void OnIsEditModeChanged(bool value) => OnPropertyChanged(nameof(RangeButtonText));
 
@@ -132,7 +180,7 @@ public sealed partial class MainViewModel : ObservableObject
     private string _manualDuration = "00:00:00";
 
     [ObservableProperty]
-    private DateTime _manualStartDate = DateTime.Today;
+    private DateTime? _manualStartDate = DateTime.Today;
 
     [ObservableProperty]
     private string _manualStartTime = "00:00:00";
@@ -190,8 +238,54 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task InitializeAsync(string databasePath)
     {
         DatabasePathText = databasePath;
+        _entryPreferencesPath = databasePath + ".view.json";
+        var preferences = await EntryQueryPreferences.LoadAsync(_entryPreferencesPath);
+        _activeFilter = preferences.Applied.ToFilter();
+        _activeSort = preferences.Applied.Sort;
+        _activeDescending = preferences.Applied.Descending;
+        var draft = preferences.Draft;
+        FilterDescription = draft.Description ?? string.Empty;
+        FilterFromDate = draft.FromDate;
+        FilterToDate = draft.ToDate;
+        FilterStatus = StatusFilters.Contains(draft.Status) ? draft.Status : "All";
+        SelectedEntrySort = Enum.IsDefined(draft.Sort) ? draft.Sort : TimeEntrySort.Start;
+        SortDescending = draft.Descending;
+        IsFiltersExpanded = preferences.FiltersExpanded;
+        NotifyEntryQueryState();
         await LoadEntriesAsync(resetPage: true);
         await RestoreRunningTimerAsync();
+    }
+
+    public async Task SaveEntryQueryPreferencesAsync()
+    {
+        if (_entryPreferencesPath is null) return;
+        await _preferencesGate.WaitAsync();
+        try
+        {
+            await new EntryQueryPreferences
+            {
+                Applied = new EntryQuerySelection
+                {
+                    Description = _activeFilter.Description,
+                    FromDate = _activeFilter.FromUtc?.ToLocalTime().Date,
+                    ToDate = _activeFilter.ToUtcExclusive?.ToLocalTime().Date.AddDays(-1),
+                    Status = _activeFilter.IsRunning == true ? "Running" : _activeFilter.IsRunning == false ? "Completed" : "All",
+                    Sort = _activeSort, Descending = _activeDescending
+                },
+                Draft = new EntryQuerySelection
+                {
+                    Description = FilterDescription, FromDate = FilterFromDate, ToDate = FilterToDate,
+                    Status = FilterStatus, Sort = SelectedEntrySort, Descending = SortDescending
+                },
+                FiltersExpanded = IsFiltersExpanded
+            }.SaveAsync(_entryPreferencesPath);
+            EntryPreferencesError = string.Empty;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            EntryPreferencesError = $"Could not save list preferences: {ex.Message}";
+        }
+        finally { _preferencesGate.Release(); }
     }
 
     private async Task LoadEntriesAsync(bool resetPage = false)
@@ -228,9 +322,11 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 Entries.Add(TimeEntryViewModel.FromModel(entry));
             }
-            var total = TimeSpan.FromSeconds(entries.Where(e => !e.IsRunning).Sum(e => (long)e.DurationSeconds));
+            var totalSeconds = entries.Where(e => !e.IsRunning).Sum(e => (long)e.DurationSeconds);
+            WeekTotalText = $"{(filter.IsActive ? "Filtered completed total" : "Completed this week")}: {DurationFormatter.HoursMinutes(totalSeconds)}";
+            EmptyEntriesText = filter.IsActive ? "No matching entries in this week" : "No entries this week";
             WeekPageText = $"{week:ddd, dd MMM yyyy} – {week.AddDays(6):ddd, dd MMM yyyy}   ·   Week {EntryWeek.Count(week, newest)} of {EntryWeek.Count(oldest, newest)}";
-            EntryPageSummary = $"{entries.Count} entries this week · {bounds.Count} matching entries overall · Week total: {(long)total.TotalHours} h {total.Minutes} min (completed entries)";
+            EntryPageSummary = $"{entries.Count} entries this week · {bounds.Count} matching entries overall · Week total: {DurationFormatter.HoursMinutes(totalSeconds)} (completed entries)";
             if (entries.Count == 0)
             {
                 EntryPageSummary += " · No matching entries in this week.";
@@ -277,6 +373,8 @@ public sealed partial class MainViewModel : ObservableObject
         };
         _activeSort = SelectedEntrySort;
         _activeDescending = SortDescending;
+        NotifyEntryQueryState();
+        await SaveEntryQueryPreferencesAsync();
         await LoadEntriesAsync(resetPage: true);
     }
 
@@ -321,12 +419,11 @@ public sealed partial class MainViewModel : ObservableObject
         _runningStartUtc = running.StartUtc ?? DateTime.UtcNow;
         IsTimerRunning = true;
         RunningStatusText = $"Running: {running.Description}";
-        RunningDescription = running.Description;
         _runningTimer.IsEnabled = true;
         UpdateRunningDisplay();
     }
 
-    partial void OnSelectedEntryChanged(TimeEntryViewModel? value)
+    private void LoadEntryForEditing(TimeEntryViewModel? value)
     {
         if (value is null)
         {
@@ -369,7 +466,6 @@ public sealed partial class MainViewModel : ObservableObject
         _runningStartUtc = startUtc;
         IsTimerRunning = true;
         RunningStatusText = $"Running: {description}";
-        RunningDescription = description;
         _runningTimer.IsEnabled = true;
         UpdateRunningDisplay();
         await LoadEntriesAsync().ConfigureAwait(true);
@@ -410,7 +506,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         var elapsed = DateTime.UtcNow - _runningStartUtc;
-        RunningElapsedText = $"{elapsed.Hours:D2}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
+        RunningElapsedText = DurationFormatter.Clock(elapsed.Ticks / TimeSpan.TicksPerSecond);
         var description = RunningStatusText.StartsWith("Running: ", StringComparison.Ordinal)
             ? RunningStatusText.Substring("Running: ".Length)
             : RunningStatusText;
@@ -418,28 +514,6 @@ public sealed partial class MainViewModel : ObservableObject
         TaskbarProgressState = System.Windows.Shell.TaskbarItemProgressState.Normal;
         TaskbarProgressValue = (DateTime.UtcNow.Second % 60) / 60.0;
     }
-
-    public async Task UpdateRunningDescriptionAsync(string newDescription)
-    {
-        if (!_runningEntryId.HasValue)
-        {
-            return;
-        }
-
-        var id = _runningEntryId.Value;
-        var description = string.IsNullOrWhiteSpace(newDescription) ? DefaultTimerDescription : newDescription.Trim();
-        await _repository.UpdateRunningDescriptionAsync(id, description).ConfigureAwait(true);
-        if (_runningEntryId == id && IsTimerRunning)
-        {
-            RunningDescription = description;
-            RunningStatusText = $"Running: {description}";
-            UpdateRunningDisplay();
-        }
-        await LoadEntriesAsync().ConfigureAwait(true);
-    }
-
-    [RelayCommand]
-    private Task SaveRunningDescriptionAsync() => UpdateRunningDescriptionAsync(RunningDescription);
 
     public void ToggleTimer()
     {
@@ -456,9 +530,20 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task AddDurationEntryAsync()
     {
-        if (!DurationParser.TryParse(ManualDuration, out var duration) || duration <= TimeSpan.Zero)
+        ManualDurationError = string.Empty;
+        if (!ManualEntryValidation.TryDuration(ManualDuration, out var duration))
         {
-            MessageBox.Show("Please enter a valid duration.", "Invalid Duration", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ManualDurationError = "Enter a duration from 1 second to 24 hours. Whole numbers mean minutes; decimals mean hours. Use minutes:seconds or hours:minutes:seconds (components 00–59).";
+            return;
+        }
+        if (!ManualStartDate.HasValue)
+        {
+            ManualDurationError = "Choose a Start Date.";
+            return;
+        }
+        if (IsEditMode && SelectedEntry?.IsRunning == true)
+        {
+            ManualDurationError = "Stop the timer before changing its duration or date.";
             return;
         }
 
@@ -469,10 +554,15 @@ public sealed partial class MainViewModel : ObservableObject
             var entry = SelectedEntry.ToModel();
             entry.Description = description;
             entry.DurationSeconds = (int)duration.TotalSeconds;
-            var startLocal = ManualStartDate.Date + (entry.StartUtc?.ToLocalTime().TimeOfDay ?? TimeSpan.Zero);
+            var startLocal = ManualStartDate.Value.Date + (entry.StartUtc?.ToLocalTime().TimeOfDay ?? TimeSpan.Zero);
             entry.StartUtc = startLocal.ToUniversalTime();
             if (entry.EndUtc.HasValue)
             {
+                if (entry.StartUtc.Value > DateTime.MaxValue.Subtract(duration))
+                {
+                    ManualDurationError = "The selected date and duration exceed the supported date range.";
+                    return;
+                }
                 entry.EndUtc = entry.StartUtc.Value.Add(duration);
             }
             await _repository.UpdateEntryAsync(entry).ConfigureAwait(true);
@@ -480,7 +570,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         else
         {
-            await _repository.AddDurationEntryAsync(description, duration, ManualStartDate).ConfigureAwait(true);
+            await _repository.AddDurationEntryAsync(description, duration, ManualStartDate.Value).ConfigureAwait(true);
             ManualDescription = string.Empty;
             ManualDuration = "00:00:00";
             ManualStartDate = DateTime.Today;
@@ -492,25 +582,36 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task AddManualRangeEntryAsync()
     {
-        if (!TryParseTime(ManualStartTime, out var startTime) || !TryParseTime(ManualEndTime, out var endTime))
+        ManualRangeError = string.Empty;
+        if (!ManualEntryValidation.TryTime(ManualStartTime, out var startTime) || !ManualEntryValidation.TryTime(ManualEndTime, out var endTime))
         {
-            MessageBox.Show("Please enter valid start and end times.", "Invalid Time", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ManualRangeError = "Use 24-hour H:mm or HH:mm:ss times: hours 00–23, minutes and seconds 00–59. Example: 09:30 or 09:30:00.";
             return;
         }
 
-        if (startTime < TimeSpan.Zero || startTime >= TimeSpan.FromDays(1) ||
-            endTime < TimeSpan.Zero || endTime >= TimeSpan.FromDays(1))
+        if (!RangeStartDate.HasValue)
         {
-            MessageBox.Show("Start and end times must be within the selected day.", "Invalid Time", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ManualRangeError = "Choose a Start Date.";
+            return;
+        }
+        if (IsEditMode && SelectedEntry?.IsRunning == true)
+        {
+            ManualRangeError = "Stop the timer before changing its times or date.";
             return;
         }
 
-        var startLocal = RangeStartDate.Date + startTime;
-        var endLocal = RangeStartDate.Date + endTime;
+        var startLocal = RangeStartDate.Value.Date + startTime;
+        var endLocal = RangeStartDate.Value.Date + endTime;
 
         if (endLocal <= startLocal)
         {
-            MessageBox.Show("End time must be after start time.", "Invalid Range", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ManualRangeError = "End time must be after start time on the same day.";
+            return;
+        }
+        if (TimeZoneInfo.Local.IsInvalidTime(startLocal) || TimeZoneInfo.Local.IsInvalidTime(endLocal) ||
+            TimeZoneInfo.Local.IsAmbiguousTime(startLocal) || TimeZoneInfo.Local.IsAmbiguousTime(endLocal))
+        {
+            ManualRangeError = "These times fall in a clock-change gap or repeated hour. Choose unambiguous local times.";
             return;
         }
 
@@ -522,7 +623,7 @@ public sealed partial class MainViewModel : ObservableObject
             entry.Description = description;
             entry.StartUtc = startLocal.ToUniversalTime();
             entry.EndUtc = endLocal.ToUniversalTime();
-            entry.DurationSeconds = (int)(endLocal - startLocal).TotalSeconds;
+            entry.DurationSeconds = (int)(entry.EndUtc.Value - entry.StartUtc.Value).TotalSeconds;
             await _repository.UpdateEntryAsync(entry).ConfigureAwait(true);
             CancelEdit();
         }
@@ -547,6 +648,36 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         SelectedEntry = entry;
+        LoadEntryForEditing(entry);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStopEntry))]
+    private async Task StopEntryAsync(TimeEntryViewModel? entry)
+    {
+        if (entry is null || !entry.IsRunning)
+        {
+            return;
+        }
+        await _repository.StopTimerAsync(entry.Id, DateTime.UtcNow);
+        if (_runningEntryId == entry.Id)
+        {
+            ResetRunningState();
+        }
+        await LoadEntriesAsync();
+    }
+
+    private bool CanStopEntry(TimeEntryViewModel? entry) => entry?.IsRunning == true;
+
+    private void ResetRunningState()
+    {
+        _runningEntryId = null;
+        IsTimerRunning = false;
+        _runningTimer.IsEnabled = false;
+        RunningStatusText = "No running timer.";
+        RunningElapsedText = "00:00:00";
+        TaskbarProgressState = System.Windows.Shell.TaskbarItemProgressState.None;
+        TaskbarProgressValue = 0;
+        WindowTitle = "Time Tracker";
     }
 
     [RelayCommand]
@@ -557,20 +688,15 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var result = MessageBox.Show($"Delete entry '{entry.Description}'?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes)
+        if (!ConfirmWindow.Confirm("Remove entry?", $"Remove '{entry.Description}'? This entry will be deleted from your local database.", "Remove entry"))
         {
             return;
         }
 
         await _repository.DeleteEntryAsync(entry.Id).ConfigureAwait(true);
-        if (entry.IsRunning)
+        if (_runningEntryId == entry.Id)
         {
-            _runningEntryId = null;
-            IsTimerRunning = false;
-            _runningTimer.IsEnabled = false;
-            RunningStatusText = "No running timer.";
-            RunningElapsedText = "00:00:00";
+            ResetRunningState();
         }
 
         await LoadEntriesAsync().ConfigureAwait(true);
@@ -617,7 +743,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 if (DateTime.TryParseExact(item.StartDate, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out _) &&
                     TimeSpan.TryParse(item.StartTime, out _) &&
-                    TimeSpan.TryParse(item.Duration, out var duration))
+                    TryParseImportedDuration(item.Duration, out var duration))
                 {
                     var description = string.IsNullOrWhiteSpace(item.Description) ? DefaultTimerDescription : item.Description;
                     await _repository.AddDurationEntryAsync(description, duration).ConfigureAwait(true);
@@ -641,7 +767,7 @@ public sealed partial class MainViewModel : ObservableObject
             }).ConfigureAwait(true);
 
             await LoadEntriesAsync().ConfigureAwait(true);
-            MessageBox.Show($"Imported {count} entries.", "Import", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"Imported {count} entries. Skipped {data.TimeEntries.Count - count} invalid or unrepresentable entries.", "Import", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -652,10 +778,22 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ExportAsync()
     {
-        var entries = await _repository.GetRecentEntriesAsync(10000).ConfigureAwait(true);
+        var range = new ExportOptionsWindow { Owner = System.Windows.Application.Current.MainWindow };
+        if (range.ShowDialog() != true) return;
+
+        IReadOnlyList<TimeEntry> entries;
+        try
+        {
+            entries = await _repository.GetExportEntriesAsync(range.FromUtc, range.ToUtcExclusive);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not load entries for export: {ex.Message}", "Export", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
         if (entries.Count == 0)
         {
-            MessageBox.Show("No entries to export.", "Export", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("No completed entries in the selected date range.", "Export", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -679,7 +817,6 @@ public sealed partial class MainViewModel : ObservableObject
                 {
                     var startLocal = e.StartUtc?.ToLocalTime() ?? e.CreatedUtc.ToLocalTime();
                     var endLocal = e.EndUtc?.ToLocalTime() ?? startLocal;
-                    var duration = TimeSpan.FromSeconds(e.DurationSeconds);
                     return new TimeEntryExportItemDto
                     {
                         Description = e.Description,
@@ -687,7 +824,7 @@ public sealed partial class MainViewModel : ObservableObject
                         StartTime = startLocal.ToString("HH:mm:ss"),
                         EndDate = endLocal.ToString("yyyy-MM-dd"),
                         EndTime = endLocal.ToString("HH:mm:ss"),
-                        Duration = duration.ToString("hh\\:mm\\:ss")
+                        Duration = DurationFormatter.Clock(e.DurationSeconds)
                     };
                 })
                 .OrderByDescending(e => e.StartDate)
@@ -707,6 +844,9 @@ public sealed partial class MainViewModel : ObservableObject
                 LastEntryDescription = items.FirstOrDefault()?.Description,
                 LastEntryStartUtc = items.FirstOrDefault() is { } last && DateTime.TryParse(last.StartDate, out var lastDate) ? lastDate.ToUniversalTime() : null,
                 FilePath = dialog.FileName,
+                Notes = range.FromUtc.HasValue || range.ToUtcExclusive.HasValue
+                    ? $"Local date range: {range.FromUtc?.ToLocalTime().ToString("yyyy-MM-dd") ?? "any"} to {range.ToUtcExclusive?.ToLocalTime().AddDays(-1).ToString("yyyy-MM-dd") ?? "any"} (inclusive)."
+                    : "All completed entries.",
                 OccurredUtc = DateTime.UtcNow
             }).ConfigureAwait(true);
 
@@ -721,8 +861,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ClearAllDataAsync()
     {
-        var result = MessageBox.Show("Are you sure you want to clear all data? This cannot be undone.", "Clear All Data", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (result != MessageBoxResult.Yes)
+        if (!ConfirmWindow.Confirm("Clear all data?", "All time entries will be removed. This cannot be undone.", "Clear all data"))
         {
             return;
         }
@@ -875,30 +1014,16 @@ public sealed partial class MainViewModel : ObservableObject
         RangeStartDate = DateTime.Today;
         ManualStartTime = "00:00:00";
         ManualEndTime = "00:00:00";
+        ManualDurationError = string.Empty;
+        ManualRangeError = string.Empty;
     }
 
-    private static bool TryParseTime(string input, out TimeSpan time)
+    private static bool TryParseImportedDuration(string input, out TimeSpan duration)
     {
-        time = TimeSpan.Zero;
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return false;
-        }
-
-        var parts = input.Split(':');
-        if (parts.Length == 2 && int.TryParse(parts[0], out var hours) && int.TryParse(parts[1], out var minutes))
-        {
-            time = new TimeSpan(hours, minutes, 0);
-            return true;
-        }
-
-        if (parts.Length == 3 && int.TryParse(parts[0], out var h) && int.TryParse(parts[1], out var m) && int.TryParse(parts[2], out var s))
-        {
-            time = new TimeSpan(h, m, s);
-            return true;
-        }
-
-        return TimeSpan.TryParse(input, out time);
+        // Accept full-hour exports and legacy TimeSpan day notation; no manual 24-hour cap.
+        return (DurationParser.TryParse(input, out duration) ||
+                TimeSpan.TryParse(input, System.Globalization.CultureInfo.InvariantCulture, out duration)) &&
+               duration >= TimeSpan.Zero && duration.TotalSeconds <= int.MaxValue;
     }
 }
 

@@ -7,98 +7,58 @@ public static class DurationParser
     public static bool TryParse(string? input, out TimeSpan result)
     {
         result = TimeSpan.Zero;
-        if (string.IsNullOrWhiteSpace(input))
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var text = input.Trim();
+        if (text.Any(c => (c < '0' || c > '9') && c != ':' && c != '.' && c != ',')) return false;
+        decimal seconds;
+        try
         {
-            return false;
-        }
-
-        var trimmed = input.Trim();
-
-        if (trimmed.Contains('.') || trimmed.Contains(','))
-        {
-            var normalized = trimmed.Replace(',', '.');
-            if (double.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out var hours))
+            if (text.Contains('.') || text.Contains(','))
             {
-                var parsed = TimeSpan.FromHours(hours);
-                if (parsed > TimeSpan.Zero)
+                var parts = text.Replace(',', '.').Split('.');
+                if (parts.Length != 2 || parts.Any(string.IsNullOrEmpty) || text.Contains(':') ||
+                    !decimal.TryParse(text.Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var hours))
+                    return false;
+                seconds = decimal.Truncate(hours * 3600);
+            }
+            else
+            {
+                var parts = text.Split(':');
+                if (parts.Length == 1)
                 {
-                    result = parsed;
-                    return true;
+                    if (!TryNumber(parts[0], out var minutes)) return false;
+                    seconds = (decimal)minutes * 60;
                 }
-            }
-
-            return false;
-        }
-
-        var parts = trimmed.Split(':');
-        if (parts.Length == 1)
-        {
-            if (int.TryParse(parts[0], out var minutes))
-            {
-                var parsed = TimeSpan.FromMinutes(minutes);
-                if (parsed >= TimeSpan.Zero)
+                else if (parts.Length == 2)
                 {
-                    result = parsed;
-                    return true;
+                    if (parts.All(string.IsNullOrEmpty) ||
+                        !TryNumber(parts[0], out var minutes, allowEmpty: true) ||
+                        !TryNumber(parts[1], out var componentSeconds, allowEmpty: true) || componentSeconds > 59)
+                        return false;
+                    seconds = (decimal)minutes * 60 + componentSeconds;
                 }
+                else if (parts.Length == 3)
+                {
+                    if (!TryNumber(parts[0], out var hours) || !TryNumber(parts[1], out var minutes) ||
+                        !TryNumber(parts[2], out var componentSeconds) || minutes > 59 || componentSeconds > 59)
+                        return false;
+                    seconds = (decimal)hours * 3600 + minutes * 60 + componentSeconds;
+                }
+                else return false;
             }
-
-            return false;
+            if (seconds > TimeSpan.MaxValue.Ticks / TimeSpan.TicksPerSecond) return false;
+            result = TimeSpan.FromTicks((long)seconds * TimeSpan.TicksPerSecond);
+            return true;
         }
-
-        if (parts.Length == 2)
+        catch (OverflowException)
         {
-            var minutesParsed = int.TryParse(parts[0], out var minutes) || string.IsNullOrEmpty(parts[0]);
-            if (!minutesParsed && !string.IsNullOrEmpty(parts[0]))
-            {
-                return false;
-            }
-
-            var secondsParsed = int.TryParse(parts[1], out var seconds) || string.IsNullOrEmpty(parts[1]);
-            if (!secondsParsed && !string.IsNullOrEmpty(parts[1]))
-            {
-                return false;
-            }
-
-            var parsed = new TimeSpan(0, minutes, seconds);
-            if (parsed >= TimeSpan.Zero)
-            {
-                result = parsed;
-                return true;
-            }
-
             return false;
         }
+    }
 
-        if (parts.Length == 3)
-        {
-            if (!int.TryParse(parts[0], out var hours))
-            {
-                return false;
-            }
-
-            var minutesParsed = int.TryParse(parts[1], out var minutes) || string.IsNullOrEmpty(parts[1]);
-            if (!minutesParsed && !string.IsNullOrEmpty(parts[1]))
-            {
-                return false;
-            }
-
-            var secondsParsed = int.TryParse(parts[2], out var seconds) || string.IsNullOrEmpty(parts[2]);
-            if (!secondsParsed && !string.IsNullOrEmpty(parts[2]))
-            {
-                return false;
-            }
-
-            var parsed = new TimeSpan(hours, minutes, seconds);
-            if (parsed >= TimeSpan.Zero)
-            {
-                result = parsed;
-                return true;
-            }
-
-            return false;
-        }
-
-        return false;
+    private static bool TryNumber(string text, out long number, bool allowEmpty = false)
+    {
+        number = 0;
+        return (allowEmpty && text.Length == 0) || long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number);
     }
 }

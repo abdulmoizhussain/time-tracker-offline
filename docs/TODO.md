@@ -2,7 +2,35 @@
 
 This file preserves the original development backlog that was previously kept in `TimeTracker.App\README.md`.
 
+Original author statements and requirement history are maintained separately in [AUTHOR_REQUIREMENTS.md](AUTHOR_REQUIREMENTS.md). Keep implementation status here; preserve the author's wording there.
+
 ## Completed Recently
+
+- [x] Move duration hints and the help link into parentheses beside the By duration heading, removing the standalone hint line (AR-018).
+
+- [x] Make File Exit explicitly say it closes the entire app, including the tray, with explanatory tooltip/accessibility text (AR-017).
+
+- [x] Rename the range action to + Add with Range, align both manual actions with their fields, and move daily completed totals beside date labels (AR-016).
+
+- [x] Reduce shared input-field vertical padding/heights, including date/dropdown inputs and aligned manual/filter actions (AR-014).
+
+- [x] Strengthen header separators; left-align entry values except ID/Timer; persist query selections across launches; offer optional inclusive export dates before choosing the output file (AR-013).
+- [x] Add synchronized File/tray Launch at startup toggles using the current user's Run value; startup launches remain hidden in the tray with session recording active, normal launches restore the app (AR-015).
+- [ ] Verify sign-in startup, lock/unlock recording while initially hidden, and startup toggles in both native menus in an interactive Windows session.
+
+- [x] Implement the approved UI refresh plan: shared light theme, compact timer/manual rows, expandable filters, readable entry table, running indicators, tray/secondary-window styling, and matching confirmations (AR-012; `UI_PLAN.md`).
+- [ ] Verify the refreshed UI interactively on mixed-DPI monitors and in Windows high-contrast mode; inspect native tray placement and popup/window focus behavior.
+
+- [x] Add row context menus for confirmed removal and conditional stopping; show/perform Stop on running-row buttons (AR-010).
+- [x] Remove the running-description editors and single/double-click form population pending the author's replacement design (AR-010).
+
+- [x] Create the author requirements record with original conversation quotes, separate implementation assumptions, and ongoing maintenance guidance (AR-009).
+
+- [x] Add strict manual duration/time/date validation with inline errors, reject overflow safely, and display/export large existing durations in full hours without capping calculations.
+
+- [x] Move Start Date to the far left of both manual-entry rows with a narrower date column and wider Description in the middle.
+
+- [x] Highlight in-progress entries in the list using the running state, with a tooltip and accessibility status.
 
 - [x] Add Help → Usage with duration formats and guides for manual entry, timers, tray controls, filtering, sorting, and week navigation.
 
@@ -14,7 +42,7 @@ This file preserves the original development backlog that was previously kept in
 - [x] Show Created and Modified timestamps in the entry list in local time.
 - [x] Position the tray popup near the clicked tray area with monitor/DPI-aware placement.
 - [x] Fix the tray popup's Open App action to restore the main window.
-- [x] Add explicit running-description editors with Save/Enter in the main window and tray popup (items 8 and 9).
+- [x] Initially add explicit running-description editors with Save/Enter (items 8 and 9); subsequently reverted per AR-010, with replacement design pending.
 
 - [x] Fix startup `StackOverflowException` caused by the `OnStartup` handler sharing the protected method name.
 - [x] Fix icon/XAML resource load failure by loading the icon from disk at runtime.
@@ -53,9 +81,9 @@ This file preserves the original development backlog that was previously kept in
 
 7. Add a periodic pop-up reminder to stop the timer if it has been running for a long time, e.g. every 15 minutes. This helps avoid forgotten timers and keeps time-tracking data accurate.
 
-8. [x] Allow modifying the description after starting the timer.
+8. [ ] Allow modifying the description after starting the timer. Previous Save/Enter editors reverted at the author's request; replacement design pending (AR-010).
 
-9. [x] Allow modifying the ongoing timer description from the tray icon mini window.
+9. [ ] Allow modifying the ongoing timer description from the tray icon mini window. Previous editor reverted; replacement design pending (AR-010).
 
 10. Add a right-click context menu to copy the description to the clipboard.
 

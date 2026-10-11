@@ -31,6 +31,11 @@ public sealed partial class TimeEntryViewModel : ObservableObject
 
     public string ModifiedLocalText => UpdatedUtc.ToLocalTime().ToString("g");
 
+    public string CreatedLocalCompactText => CreatedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss");
+    public string ModifiedLocalCompactText => UpdatedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss");
+    public string StartLocalCompactText => StartUtc?.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss") ?? "—";
+    public string EndLocalCompactText => EndUtc?.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss") ?? "—";
+
     public DateTime GroupDate => (StartUtc ?? EndUtc ?? CreatedUtc).ToLocalTime().Date;
 
     public string StartLocalText => StartUtc?.ToLocalTime().ToString("g") ?? string.Empty;
@@ -41,8 +46,7 @@ public sealed partial class TimeEntryViewModel : ObservableObject
     {
         get
         {
-            var duration = TimeSpan.FromSeconds(DurationSeconds);
-            return $"{duration.Hours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}";
+            return DurationFormatter.Clock(DurationSeconds);
         }
     }
 

@@ -21,6 +21,7 @@ All data is local; there is no cloud backend.
 ## How to Approach Changes
 
 1. **Read before writing** — understand the relevant view-model, repository, and XAML before changing behaviour.
+   - Read relevant entries in `docs/AUTHOR_REQUIREMENTS.md` to check the author's original wording and distinguish it from agent assumptions. Later explicit author corrections take precedence.
 2. **Prefer small, focused changes** — this is a single-user desktop app; keep PRs easy to review.
 3. **Preserve existing patterns**:
    - Use `CommunityToolkit.Mvvm` source generators (`[ObservableProperty]`, `[RelayCommand]`).
@@ -29,6 +30,7 @@ All data is local; there is no cloud backend.
 4. **Update documentation** when adding features:
    - Update `README.md` for user-facing changes.
    - Update `docs/TODO.md` when a TODO is completed or added.
+   - Append new author requirements and meaningful corrections to `docs/AUTHOR_REQUIREMENTS.md` using its maintenance rules. Preserve exact quotes when available, keep original quotes unchanged, and label interpretation/implementation decisions separately. Do not invent historical quotations from backlog/spec text.
 5. **Build before finishing** — run `dotnet build TimeTracker.sln` and ensure zero errors.
 
 ---
