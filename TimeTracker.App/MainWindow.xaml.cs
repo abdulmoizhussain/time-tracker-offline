@@ -107,10 +107,10 @@ public partial class MainWindow : Window
     {
         if (_trayPopup is null || _trayPopup.IsClosed)
         {
-            _trayPopup = new TrayPopupWindow(ViewModel);
+            _trayPopup = new TrayPopupWindow(this);
         }
 
-        _trayPopup.Show();
+        _trayPopup.ShowNearTray(System.Windows.Forms.Cursor.Position);
         _trayPopup.Activate();
     }
 
@@ -197,6 +197,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnUsageClick(object sender, RoutedEventArgs e)
+    {
+        var window = new UsageWindow { Owner = this };
+        window.ShowDialog();
+    }
+
     private void OnAboutClick(object sender, RoutedEventArgs e)
     {
         var window = new AboutWindow()
@@ -271,6 +277,20 @@ public partial class MainWindow : Window
     private void OnManualDescriptionTextChanged(object sender, TextChangedEventArgs e)
     {
         // Suggestions update is handled via PropertyChanged in ViewModel.
+    }
+
+    private void OnRangeDescriptionLostFocus(object sender, RoutedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(() => ViewModel.IsRangeSuggestionsOpen = false, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    private void OnRangeSuggestionSelected(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is System.Windows.Controls.ListBox { SelectedItem: string suggestion })
+        {
+            ViewModel.RangeDescription = suggestion;
+            ViewModel.IsRangeSuggestionsOpen = false;
+        }
     }
 
     private void OnManualSuggestionSelected(object sender, System.Windows.Input.MouseButtonEventArgs e)

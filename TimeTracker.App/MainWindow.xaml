@@ -7,7 +7,7 @@
         xmlns:conv="clr-namespace:TimeTracker.App.Converters"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Height="650"
+        Height="800"
         Width="1100"
         MinWidth="960"
         MinHeight="550"
@@ -63,6 +63,7 @@
                 <MenuItem Header="Import/Export _History" Click="OnImportExportHistoryClick" />
             </MenuItem>
             <MenuItem Header="_Help">
+                <MenuItem Header="_Usage..." Click="OnUsageClick" AutomationProperties.AutomationId="UsageMenuItem" />
                 <MenuItem Header="_About" Click="OnAboutClick" />
             </MenuItem>
         </Menu>
@@ -78,6 +79,22 @@
                        HorizontalAlignment="Center"
                        Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}"
                        Margin="0,2,0,0" />
+            <Grid Margin="0,8,0,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Running task description" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBox Grid.Column="1" Text="{Binding RunningDescription, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.AutomationId="RunningDescriptionTextBox" Padding="6,4">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding SaveRunningDescriptionCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+                <Button Grid.Column="2" Content="Save" Command="{Binding SaveRunningDescriptionCommand}"
+                        AutomationProperties.AutomationId="SaveRunningDescriptionButton" Margin="8,0,0,0" Padding="12,4" />
+            </Grid>
         </StackPanel>
 
         <!-- TimerSection -->
@@ -142,15 +159,20 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Description" Margin="0,0,0,4" />
-            <TextBlock Grid.Row="0" Grid.Column="1" Text="Duration" Margin="0,0,0,4" />
-            <TextBlock Grid.Row="0" Grid.Column="2" Text="Start Date" Margin="0,0,0,4" />
-            <TextBlock Grid.Row="0" Grid.Column="3" Text="Start Time" Margin="0,0,0,4" />
-            <TextBlock Grid.Row="0" Grid.Column="4" Text="End Time" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="5" Text="Add by duration" FontWeight="SemiBold" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Description" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="Start Date" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="Duration" Margin="0,0,0,4" />
+            <Button Grid.Row="0" Grid.Column="5" Content="Cancel edit" Command="{Binding CancelEditCommand}"
+                    Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-            <Grid Grid.Row="1" Grid.Column="0" Margin="0,0,8,0">
+            <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,8,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -177,20 +199,88 @@
                     </Border>
                 </Popup>
             </Grid>
-            <TextBox Grid.Row="1" Grid.Column="1" x:Name="ManualDurationTextBox" AutomationProperties.AutomationId="ManualDurationTextBox" Text="{Binding ManualDuration}" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
-            <DatePicker Grid.Row="1" Grid.Column="2" SelectedDate="{Binding ManualStartDate}" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
-            <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding ManualStartTime}" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
-            <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding ManualEndTime}" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
-            <StackPanel Grid.Row="1" Grid.Column="5" Orientation="Horizontal">
-                <Button x:Name="AddDurationButton" AutomationProperties.AutomationId="AddDurationButton" Content="{Binding AddButtonText}" Command="{Binding AddDurationEntryCommand}" Padding="12,6" />
-                <Button x:Name="AddRangeButton" AutomationProperties.AutomationId="AddRangeButton" Content="Add Range" Command="{Binding AddManualRangeEntryCommand}" Padding="12,6" Margin="8,0,0,0" />
-            </StackPanel>
+            <DatePicker Grid.Row="2" Grid.Column="1" SelectedDate="{Binding ManualStartDate}"
+                        AutomationProperties.AutomationId="DurationStartDatePicker" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
+            <TextBox Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" x:Name="ManualDurationTextBox" AutomationProperties.AutomationId="ManualDurationTextBox" Text="{Binding ManualDuration}" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
+            <Button Grid.Row="2" Grid.Column="5" x:Name="AddDurationButton" AutomationProperties.AutomationId="AddDurationButton" Content="{Binding AddButtonText}" Command="{Binding AddDurationEntryCommand}" Padding="12,6" />
+
+            <TextBlock Grid.Row="3" Grid.ColumnSpan="6" Text="Add by start and end time" FontWeight="SemiBold" Margin="0,12,0,6" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Description" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="Start Date" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="4" Grid.Column="2" Text="Start Time" Margin="0,0,0,4" />
+            <TextBlock Grid.Row="4" Grid.Column="3" Text="End Time" Margin="0,0,0,4" />
+            <Grid Grid.Row="5" Grid.Column="0" Margin="0,0,8,0">
+                <TextBox x:Name="RangeDescriptionTextBox" AutomationProperties.AutomationId="RangeDescriptionTextBox"
+                         Text="{Binding RangeDescription, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalContentAlignment="Center" Padding="6,4"
+                         GotFocus="OnManualDescriptionGotFocus" LostFocus="OnRangeDescriptionLostFocus" />
+                <Popup Placement="Bottom" PlacementTarget="{Binding ElementName=RangeDescriptionTextBox}"
+                       IsOpen="{Binding IsRangeSuggestionsOpen, Mode=TwoWay}" StaysOpen="False">
+                    <Border Background="White" BorderBrush="Gray" BorderThickness="1">
+                        <ListBox ItemsSource="{Binding RangeSuggestions}" ItemTemplate="{StaticResource SuggestionItemTemplate}"
+                                 MouseLeftButtonUp="OnRangeSuggestionSelected" />
+                    </Border>
+                </Popup>
+            </Grid>
+            <DatePicker Grid.Row="5" Grid.Column="1" SelectedDate="{Binding RangeStartDate}"
+                        AutomationProperties.AutomationId="RangeStartDatePicker" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
+            <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding ManualStartTime}"
+                     AutomationProperties.AutomationId="RangeStartTimeTextBox" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
+            <TextBox Grid.Row="5" Grid.Column="3" Grid.ColumnSpan="2" Text="{Binding ManualEndTime}"
+                     AutomationProperties.AutomationId="RangeEndTimeTextBox" VerticalContentAlignment="Center" Padding="6,4" Margin="0,0,8,0" />
+            <Button Grid.Row="5" Grid.Column="5" x:Name="AddRangeButton" AutomationProperties.AutomationId="AddRangeButton"
+                    Content="{Binding RangeButtonText}" Command="{Binding AddManualRangeEntryCommand}" Padding="12,6" />
         </Grid>
 
 
         <!-- EntriesList -->
-        <ListView Grid.Row="4"
-                  Margin="12,8"
+        <Grid Grid.Row="4" Margin="12,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <WrapPanel Grid.Row="0" Margin="0,0,0,6">
+                <StackPanel Margin="0,0,8,4">
+                    <TextBlock Text="Description contains" />
+                    <TextBox Text="{Binding FilterDescription, UpdateSourceTrigger=PropertyChanged}" Width="180"
+                             AutomationProperties.AutomationId="EntryDescriptionFilter" Padding="4" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,4">
+                    <TextBlock Text="From date" />
+                    <DatePicker SelectedDate="{Binding FilterFromDate}" Width="140" AutomationProperties.AutomationId="EntryFromDateFilter" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,4">
+                    <TextBlock Text="To date (inclusive)" />
+                    <DatePicker SelectedDate="{Binding FilterToDate}" Width="140" AutomationProperties.AutomationId="EntryToDateFilter" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,4">
+                    <TextBlock Text="Status" />
+                    <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding FilterStatus}" Width="105"
+                              AutomationProperties.AutomationId="EntryStatusFilter" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,4">
+                    <TextBlock Text="Sort within day" />
+                    <ComboBox ItemsSource="{Binding EntrySortOptions}" SelectedItem="{Binding SelectedEntrySort}" Width="105"
+                              AutomationProperties.AutomationId="EntrySortField" />
+                </StackPanel>
+                <CheckBox Content="Descending" IsChecked="{Binding SortDescending}" VerticalAlignment="Bottom" Margin="0,0,8,8" />
+                <Button Content="Apply" Command="{Binding ApplyEntryFiltersCommand}" Padding="10,4" Margin="0,0,8,4"
+                        VerticalAlignment="Bottom" AutomationProperties.AutomationId="ApplyEntryFiltersButton" />
+                <Button Content="Reset" Command="{Binding ResetEntryFiltersCommand}" Padding="10,4" Margin="0,0,0,4"
+                        VerticalAlignment="Bottom" AutomationProperties.AutomationId="ResetEntryFiltersButton" />
+            </WrapPanel>
+            <DockPanel Grid.Row="1" Margin="0,0,0,6">
+                <Button DockPanel.Dock="Left" Content="← Older week" Command="{Binding OlderWeekCommand}" Padding="8,4"
+                        AutomationProperties.AutomationId="OlderWeekButton" />
+                <Button DockPanel.Dock="Right" Content="Newer week →" Command="{Binding NewerWeekCommand}" Padding="8,4"
+                        AutomationProperties.AutomationId="NewerWeekButton" />
+                <TextBlock Text="{Binding WeekPageText}" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center"
+                           AutomationProperties.AutomationId="WeekPageLabel" Margin="8,0" />
+            </DockPanel>
+        <ListView Grid.Row="2"
+                  AutomationProperties.AutomationId="EntriesListView"
                   ItemsSource="{Binding Source={StaticResource GroupedEntries}}"
                   SelectedItem="{Binding SelectedEntry}">
             <ListView.View>
@@ -207,16 +297,24 @@
                     <GridViewColumn Header="Start" Width="160" DisplayMemberBinding="{Binding StartLocalText}" />
                     <GridViewColumn Header="End" Width="160" DisplayMemberBinding="{Binding EndLocalText}" />
                     <GridViewColumn Header="Duration" Width="120" DisplayMemberBinding="{Binding DurationText}" />
+                    <GridViewColumn Header="Created" Width="160" DisplayMemberBinding="{Binding CreatedLocalText}" />
+                    <GridViewColumn Header="Modified" Width="160" DisplayMemberBinding="{Binding ModifiedLocalText}" />
                 </GridView>
             </ListView.View>
             <ListView.GroupStyle>
                 <GroupStyle>
                     <GroupStyle.HeaderTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Name, Converter={StaticResource EntryGroupHeaderConverter}}"
-                                       FontWeight="Bold"
+                            <TextBlock FontWeight="Bold"
                                        FontSize="14"
-                                       Margin="4,8,0,4" />
+                                       Margin="4,8,0,4">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{StaticResource EntryGroupHeaderConverter}">
+                                        <Binding />
+                                        <Binding Path="ItemCount" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
                         </DataTemplate>
                     </GroupStyle.HeaderTemplate>
                 </GroupStyle>
@@ -227,6 +325,12 @@
                 </Style>
             </ListView.ItemContainerStyle>
         </ListView>
+            <StackPanel Grid.Row="3" Margin="0,6,0,0">
+                <TextBlock Text="Loading entries…" Visibility="{Binding IsEntriesLoading, Converter={StaticResource BoolToVisibilityConverter}}" />
+                <TextBlock Text="{Binding EntryPageSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="EntryPageSummary" />
+                <TextBlock Text="{Binding EntryQueryError}" Foreground="DarkRed" TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
 
 
         <TextBox Grid.Row="5"

@@ -1,0 +1,76 @@
+<Window x:Class="TimeTracker.App.UsageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Time Tracker Usage"
+        Width="660" Height="650" MinWidth="480" MinHeight="350"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Style="{StaticResource ScaledWindowStyle}">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="SectionHeading" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,16,0,6" />
+        </Style>
+    </Window.Resources>
+    <DockPanel Margin="20">
+        <Button DockPanel.Dock="Bottom" Content="Close" IsCancel="True"
+                HorizontalAlignment="Right" Padding="20,6" Margin="0,12,0,0"
+                AutomationProperties.AutomationId="CloseUsageButton" Click="OnCloseClick" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,12,0">
+                <TextBlock Text="Using Time Tracker" FontWeight="Bold" />
+                <TextBlock Text="Duration formats" Style="{StaticResource SectionHeading}" />
+                <TextBlock Text="Whole numbers mean minutes. A decimal point or comma means hours. With two colon-separated parts, use minutes:seconds; with three, use hours:minutes:seconds." Margin="0,0,0,8" />
+                <Grid AutomationProperties.AutomationId="DurationFormatsTable">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Input" FontWeight="SemiBold" Margin="0,0,24,6" />
+                    <TextBlock Grid.Column="1" Text="Duration" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <TextBlock Grid.Row="1" Text="34" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="34 minutes" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="2" Text="33:33" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="33 minutes, 33 seconds" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="3" Text="33:" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="33 minutes" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="4" Text=":33" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="33 seconds" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="5" Text="1:02:30" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="1 hour, 2 minutes, 30 seconds" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="6" Text="1.5" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="6" Grid.Column="1" Text="1 hour, 30 minutes (90 minutes)" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="7" Text="5.3" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="7" Grid.Column="1" Text="5 hours, 18 minutes" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="8" Text="2,25" Margin="0,0,24,4" />
+                    <TextBlock Grid.Row="8" Grid.Column="1" Text="2 hours, 15 minutes" Margin="0,0,0,4" />
+                </Grid>
+                <TextBlock Text="For example, 1:30 means 1 minute, 30 seconds. For 1 hour, 30 minutes, enter 1:30:00 or 1.5. Empty, invalid, zero, or negative durations cannot be added." Margin="0,8,0,0" />
+                <TextBlock Text="Manual entries" Style="{StaticResource SectionHeading}" />
+                <TextBlock Text="Add by duration: enter a description, choose a Start Date, and enter the duration. Click Add. The entry belongs to the selected date; no end time is required." />
+                <TextBlock Text="Add by start and end time: enter a description and Start Date, then times such as 09:00 or 09:00:00. The end must be after the start on the same day. Click Add Range. Each row keeps its own draft." Margin="0,8,0,0" />
+                <TextBlock Text="Select an entry to fill the forms for editing, then use Save or Save Range. Cancel edit returns to adding new entries." Margin="0,8,0,0" />
+                <TextBlock Text="Timers and the tray" Style="{StaticResource SectionHeading}" />
+                <TextBlock Text="Enter a description and click Start; click Stop when finished. A blank description uses your default timer text, configurable under Edit. To rename an ongoing task, edit Running task description in the main window or tray popup, then click Save or press Enter. The timer keeps running." />
+                <TextBlock Text="Closing or minimizing the main window hides it to the tray. Click the tray icon for the mini window; Open App restores the main window. Use File → Exit or the tray's Exit command to quit." Margin="0,8,0,0" />
+                <TextBlock Text="Browsing, filtering, and sorting" Style="{StaticResource SectionHeading}" />
+                <TextBlock Text="Older week and Newer week browse Monday–Sunday pages. Choose description, From/To dates (inclusive), or status filters, and a sort field and direction. Click Apply to show the newest matching week. Filters and sorting stay active while you change weeks; Reset restores defaults. Sorting applies within each daily group. Empty weeks remain navigable, and totals reflect matching completed entries." />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

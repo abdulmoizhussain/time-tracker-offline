@@ -27,7 +27,7 @@ A local-first, offline Windows desktop time-tracking application. It runs from t
 
 - **Offline by default** — all data lives in a local SQLite file.
 - **No floating widget** — minimize to the system tray and forget about it.
-- **Fast with large data** — indexed SQLite tables with WAL mode and paged recent-entry loading.
+- **Week-based browsing** — SQLite with WAL mode; the list queries one Monday–Sunday week at a time across the full database.
 - **Lock/unlock awareness** — optionally records Windows session lock/unlock events to help spot forgotten timers.
 - **Flexible duration input** — type `34`, `33:33`, `:33`, `1:02:30`, or `5.3` depending on what is fastest for you.
 - **Single instance** — launching the app a second time simply activates the existing window.
@@ -120,14 +120,22 @@ The app follows a layered MVVM architecture:
 
 ## Features
 
+### Usage Guide
+- Open **Help → Usage...** for duration input examples and instructions for manual entries, timers, tray controls, week navigation, filtering, and sorting.
+- The guide is scrollable and resizable, uses the app's UI scaling, and closes with **Close** or Escape.
+
 ### Timer
 - Start/stop a running timer.
 - Live elapsed-time display in the main window title, status bar, taskbar progress, and tray popup.
 - Modify the running timer description from the tray popup.
+- Edit the labeled running-task description in the main window or tray popup, then click **Save** (or press Enter). The timer continues running; blank descriptions use the configured default.
 - Default timer description is configurable in-app (default: `Untitled task`).
 
 ### Manual Entries
-- Add entries by description, date, start/end times, and duration.
+- **Add by duration**: Description, Start Date, and Duration, with its own Add/Save button.
+- **Add by start and end time**: Description, Start Date, Start Time, and End Time, with its own Add Range/Save Range button.
+- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions; selecting an existing entry fills both rows for editing, and **Cancel edit** returns to adding entries.
+- Duration entries are assigned to the selected local date (stored as midnight in `StartUtc`, with no end time); Created/Modified still reflect when the record was saved. The list groups entries by local date.
 - Duration box and start/end time boxes auto-sync on focus loss.
 - Edit existing entries inline by selecting them from the list.
 
@@ -135,12 +143,18 @@ The app follows a layered MVVM architecture:
 - Grouped by date with human-readable headers: *Today*, *Yesterday*, weekday names, or full date.
 - Daily total duration shown in each group header.
 - Sorted newest-first.
+- **Created** and **Modified** columns show each entry's timestamps in local time (scroll horizontally to see all columns).
 - Start a new timer pre-filled with an existing description.
+- **Older week / Newer week** navigation includes a week date range and page count. The default first page is the current week (or the latest week if future-dated entries exist); empty intervening weeks remain navigable.
+- Filter by description text, inclusive local From/To dates, and All/Running/Completed status. Click **Apply** to reload the newest matching week; **Reset** clears filters and restores default sorting. Blank dates impose no date limit. Description searches treat `%` and `_` literally.
+- Sort by Start, Description, Duration, Created, or Modified, ascending or descending. Daily groups stay newest-first; the chosen sort applies **within each day**. Equal values use entry ID as a stable tie-breaker. Filters and sorting persist while navigating or refreshing after changes.
+- Daily and weekly totals show completed duration for the filtered entries. The footer also shows this week's entry count and the total matching count across the database.
 
 ### System Tray
 - Minimize-to-tray on close.
 - Tray icon turns red while tracking, green while idle.
 - Left-click opens a compact popup with elapsed time and start/stop control.
+- The popup opens beside the clicked tray area on that monitor, stays within its work area, and **Open App** restores the main window.
 - Right-click menu for Open / Exit.
 
 ### Import / Export
@@ -328,7 +342,6 @@ A detailed backlog is maintained in [`docs/TODO.md`](docs/TODO.md). High-level g
 
 - Global hotkeys are configured but not implemented.
 - The About window shows the database version as `Unknown`.
-- Week-wise pagination is not implemented.
 - No automated backup/restore workflow yet.
 - UI tests cover only basic launch/start/stop/add scenarios; more control IDs are needed to automate the list view, tray menu, and dialogs.
 

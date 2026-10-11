@@ -15,6 +15,7 @@ TimeTracker has two test projects:
 |---|---|
 | `DurationParserTests` | Validates every supported duration format and rejects invalid input. |
 | `TimeEntryRepositoryTests` | Runs the SQLite repository against a temporary on-disk database and verifies schema creation, start/stop timer, manual duration entry, and manual range entry behaviour. |
+| `EntryPaginationTests` | Covers Monday/Sunday boundaries, filter bounds and literal text, both sort directions and stable ties, legacy dates, running lookup, more than 500 entries, and ViewModel navigation/filter/reset behavior on an STA dispatcher without opening windows. |
 
 ### Running the tests
 

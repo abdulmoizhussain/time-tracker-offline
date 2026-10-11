@@ -43,6 +43,13 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
         {
             await ApplyVersion2Async(connection, cancellationToken).ConfigureAwait(false);
         }
+
+        const string effectiveDateIndexSql = """
+            CREATE INDEX IF NOT EXISTS IX_TimeEntries_EffectiveUtc
+            ON TimeEntries(COALESCE(StartUtc, EndUtc, CreatedUtc));
+            """;
+        await connection.ExecuteAsync(new CommandDefinition(effectiveDateIndexSql, cancellationToken: cancellationToken))
+            .ConfigureAwait(false);
     }
 
     private static async Task ApplyVersion1Async(SqliteConnection connection, CancellationToken cancellationToken)
@@ -185,7 +192,13 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             .ConfigureAwait(false);
     }
 
-    public async Task<int> AddDurationEntryAsync(string description, TimeSpan duration, CancellationToken cancellationToken = default)
+    public Task<int> AddDurationEntryAsync(string description, TimeSpan duration, CancellationToken cancellationToken = default)
+        => AddDurationEntryCoreAsync(description, duration, null, cancellationToken);
+
+    public Task<int> AddDurationEntryAsync(string description, TimeSpan duration, DateTime startDateLocal, CancellationToken cancellationToken = default)
+        => AddDurationEntryCoreAsync(description, duration, startDateLocal.Date.ToUniversalTime(), cancellationToken);
+
+    private async Task<int> AddDurationEntryCoreAsync(string description, TimeSpan duration, DateTime? startUtc, CancellationToken cancellationToken)
     {
         const string sql = """
             INSERT INTO TimeEntries (Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc)
@@ -197,7 +210,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
         var parameters = new
         {
             Description = description,
-            StartUtc = (string?)null,
+            StartUtc = startUtc.HasValue ? ToUtcString(startUtc.Value) : (string?)null,
             EndUtc = (string?)null,
             DurationSeconds = (int)duration.TotalSeconds,
             IsRunning = 0,
@@ -276,6 +289,24 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             .ConfigureAwait(false);
     }
 
+    public async Task UpdateRunningDescriptionAsync(int id, string description, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE TimeEntries
+            SET Description = @Description, UpdatedUtc = @UpdatedUtc
+            WHERE Id = @Id AND IsRunning = 1;
+            """;
+
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            Id = id,
+            Description = description,
+            UpdatedUtc = ToUtcString(DateTime.UtcNow)
+        }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
     public async Task DeleteEntryAsync(int id, CancellationToken cancellationToken = default)
     {
         const string sql = "DELETE FROM TimeEntries WHERE Id = @Id;";
@@ -300,6 +331,85 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             new CommandDefinition(sql, new { Take = take }, cancellationToken: cancellationToken))
             .ConfigureAwait(false);
         return entries.Select(ToModel).ToList();
+    }
+
+    // Use the same effective date as the UI, including legacy duration-only entries.
+    private const string EntryFilterSql = """
+        WHERE (@Description = '' OR instr(lower(Description), lower(@Description)) > 0)
+          AND (@FromUtc IS NULL OR COALESCE(StartUtc, EndUtc, CreatedUtc) >= @FromUtc)
+          AND (@ToUtc IS NULL OR COALESCE(StartUtc, EndUtc, CreatedUtc) < @ToUtc)
+          AND (@Running IS NULL OR IsRunning = @Running)
+        """;
+
+    private static object FilterParameters(TimeEntryFilter filter) => new
+    {
+        filter.Description,
+        FromUtc = filter.FromUtc.HasValue ? ToUtcString(filter.FromUtc.Value) : null,
+        ToUtc = filter.ToUtcExclusive.HasValue ? ToUtcString(filter.ToUtcExclusive.Value) : null,
+        Running = filter.IsRunning.HasValue ? (int?)(filter.IsRunning.Value ? 1 : 0) : null
+    };
+
+    public async Task<TimeEntryDateBounds> GetEntryDateBoundsAsync(TimeEntryFilter filter, CancellationToken cancellationToken = default)
+    {
+        const string selectSql = """
+            SELECT MIN(COALESCE(StartUtc, EndUtc, CreatedUtc)) AS FirstUtc,
+                   MAX(COALESCE(StartUtc, EndUtc, CreatedUtc)) AS LastUtc,
+                   COUNT(*) AS Count FROM TimeEntries
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var bounds = await connection.QuerySingleAsync<EntryBoundsDto>(
+            new CommandDefinition(selectSql + "\n" + EntryFilterSql, FilterParameters(filter), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return new TimeEntryDateBounds(bounds.FirstUtc is null ? null : ParseUtc(bounds.FirstUtc),
+            bounds.LastUtc is null ? null : ParseUtc(bounds.LastUtc), bounds.Count);
+    }
+
+    public async Task<IReadOnlyList<TimeEntry>> GetWeekEntriesAsync(TimeEntryFilter filter, DateTime weekStartUtc,
+        DateTime weekEndUtcExclusive, TimeEntrySort sort, bool descending, CancellationToken cancellationToken = default)
+    {
+        // Only whitelisted enum values become SQL identifiers; all user input is parameterized.
+        var column = sort switch
+        {
+            TimeEntrySort.Start => "COALESCE(StartUtc, EndUtc, CreatedUtc)",
+            TimeEntrySort.Description => "Description COLLATE NOCASE",
+            TimeEntrySort.Duration => "DurationSeconds",
+            TimeEntrySort.Created => "CreatedUtc",
+            TimeEntrySort.Modified => "UpdatedUtc",
+            _ => throw new ArgumentOutOfRangeException(nameof(sort))
+        };
+        const string selectSql = "SELECT Id, Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc FROM TimeEntries ";
+        var direction = descending ? "DESC" : "ASC";
+        var sql = selectSql + EntryFilterSql +
+            " AND COALESCE(StartUtc, EndUtc, CreatedUtc) >= @WeekStart AND COALESCE(StartUtc, EndUtc, CreatedUtc) < @WeekEnd" +
+            $" ORDER BY {column} {direction}, Id {direction};";
+        var parameters = new DynamicParameters(FilterParameters(filter));
+        parameters.Add("WeekStart", ToUtcString(weekStartUtc));
+        parameters.Add("WeekEnd", ToUtcString(weekEndUtcExclusive));
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var entries = await connection.QueryAsync<TimeEntryDto>(new CommandDefinition(sql, parameters,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return entries.Select(ToModel).ToList();
+    }
+
+    public async Task<TimeEntry?> GetRunningEntryAsync(CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT Id, Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc
+            FROM TimeEntries WHERE IsRunning = 1 ORDER BY CreatedUtc DESC, Id DESC LIMIT 1;
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var entry = await connection.QueryFirstOrDefaultAsync<TimeEntryDto>(new CommandDefinition(sql,
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return entry is null ? null : ToModel(entry);
+    }
+
+    private sealed class EntryBoundsDto
+    {
+        public string? FirstUtc { get; set; }
+        public string? LastUtc { get; set; }
+        public int Count { get; set; }
     }
 
     public async Task<IReadOnlyList<string>> SearchDescriptionsAsync(string search, int take, CancellationToken cancellationToken = default)

@@ -9,6 +9,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
+        WindowStartupLocation="Manual"
         Deactivated="OnDeactivated"
         Style="{StaticResource ScaledWindowStyle}">
     <Border Background="#FF1E1E1E"
@@ -22,6 +23,7 @@
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -41,28 +43,35 @@
                        HorizontalAlignment="Center"
                        Margin="0,12,0,0" />
 
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+            <DockPanel Grid.Row="2" Margin="0,8,0,0">
                 <Ellipse Width="10" Height="10" Fill="{Binding IsTimerRunning, Converter={StaticResource RunningForegroundConverter}}" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding RunningStatusText}" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" />
-            </StackPanel>
+                <TextBlock Text="{Binding RunningStatusText}" TextWrapping="Wrap" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" />
+            </DockPanel>
 
-            <TextBox Grid.Row="3"
-                     Text="{Binding TimerDescription, UpdateSourceTrigger=PropertyChanged}"
+            <StackPanel Grid.Row="3" Margin="0,12,0,0"
+                        Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Running task description" Foreground="White" Margin="0,0,0,4" />
+                <TextBox Text="{Binding RunningDescription, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.AutomationId="TrayRunningDescriptionTextBox"
                      Foreground="White"
                      Background="#FF333333"
                      BorderThickness="0"
                      Padding="8,4"
-                     Margin="0,12,0,0"
-                     Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}"
-                     KeyDown="OnDescriptionKeyDown"
-                     LostFocus="OnDescriptionLostFocus" />
+                     TextWrapping="Wrap">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding SaveRunningDescriptionCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+                <Button Content="Save description" Command="{Binding SaveRunningDescriptionCommand}"
+                        AutomationProperties.AutomationId="TraySaveRunningDescriptionButton" Margin="0,6,0,0" Padding="8,4" />
+            </StackPanel>
 
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
+            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
                 <Button Content="Start" Padding="16,6" Click="OnStartStopClick" />
                 <Button Content="Open App" Padding="16,6" Margin="8,0,0,0" Click="OnOpenAppClick" />
             </StackPanel>
 
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Button Content="Stop" Padding="16,6" Click="OnStartStopClick" />
                 <Button Content="Open App" Padding="16,6" Margin="8,0,0,0" Click="OnOpenAppClick" />
             </StackPanel>

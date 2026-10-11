@@ -143,6 +143,7 @@ public partial class App : System.Windows.Application
         await mainViewModel.InitializeAsync(databasePath);
 
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+        MainWindow = mainWindow;
         mainWindow.Show();
     }
 

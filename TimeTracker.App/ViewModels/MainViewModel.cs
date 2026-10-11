@@ -25,6 +25,48 @@ public sealed partial class MainViewModel : ObservableObject
 
     private int? _runningEntryId;
     private DateTime _runningStartUtc;
+    private TimeEntryFilter _activeFilter = new();
+    private TimeEntrySort _activeSort = TimeEntrySort.Start;
+    private bool _activeDescending = true;
+    private DateTime _weekStart = EntryWeek.Start(DateTime.Today);
+    private DateTime _oldestWeek = EntryWeek.Start(DateTime.Today);
+    private DateTime _newestWeek = EntryWeek.Start(DateTime.Today);
+    private CancellationTokenSource? _entriesLoadCancellation;
+
+    public IReadOnlyList<string> StatusFilters { get; } = new[] { "All", "Running", "Completed" };
+    public IReadOnlyList<TimeEntrySort> EntrySortOptions { get; } = Enum.GetValues<TimeEntrySort>();
+
+    [ObservableProperty]
+    private string _filterDescription = string.Empty;
+
+    [ObservableProperty]
+    private DateTime? _filterFromDate;
+
+    [ObservableProperty]
+    private DateTime? _filterToDate;
+
+    [ObservableProperty]
+    private string _filterStatus = "All";
+
+    [ObservableProperty]
+    private TimeEntrySort _selectedEntrySort = TimeEntrySort.Start;
+
+    [ObservableProperty]
+    private bool _sortDescending = true;
+
+    [ObservableProperty]
+    private string _weekPageText = string.Empty;
+
+    [ObservableProperty]
+    private string _entryPageSummary = string.Empty;
+
+    [ObservableProperty]
+    private string _entryQueryError = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OlderWeekCommand))]
+    [NotifyCanExecuteChangedFor(nameof(NewerWeekCommand))]
+    private bool _isEntriesLoading;
 
     public MainViewModel(ITimeEntryRepository repository, IScreenSessionEventRepository sessionEventRepository, IOptions<AppRuntimeOptions> options)
     {
@@ -40,6 +82,7 @@ public sealed partial class MainViewModel : ObservableObject
         Entries = new ObservableCollection<TimeEntryViewModel>();
         TimerSuggestions = new ObservableCollection<string>();
         ManualSuggestions = new ObservableCollection<string>();
+        RangeSuggestions = new ObservableCollection<string>();
 
         LoadDefaultTimerDescription();
 
@@ -53,6 +96,10 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 _ = UpdateManualSuggestionsAsync();
             }
+            else if (e.PropertyName == nameof(RangeDescription))
+            {
+                _ = UpdateRangeSuggestionsAsync();
+            }
         };
     }
 
@@ -60,7 +107,26 @@ public sealed partial class MainViewModel : ObservableObject
     private string _timerDescription = string.Empty;
 
     [ObservableProperty]
+    private string _runningDescription = string.Empty;
+
+    [ObservableProperty]
     private string _manualDescription = string.Empty;
+
+    [ObservableProperty]
+    private string _rangeDescription = string.Empty;
+
+    [ObservableProperty]
+    private DateTime _rangeStartDate = DateTime.Today;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _rangeSuggestions;
+
+    [ObservableProperty]
+    private bool _isRangeSuggestionsOpen;
+
+    public string RangeButtonText => IsEditMode ? "Save Range" : "Add Range";
+
+    partial void OnIsEditModeChanged(bool value) => OnPropertyChanged(nameof(RangeButtonText));
 
     [ObservableProperty]
     private string _manualDuration = "00:00:00";
@@ -124,24 +190,128 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task InitializeAsync(string databasePath)
     {
         DatabasePathText = databasePath;
-        await LoadEntriesAsync();
+        await LoadEntriesAsync(resetPage: true);
         await RestoreRunningTimerAsync();
     }
 
-    private async Task LoadEntriesAsync()
+    private async Task LoadEntriesAsync(bool resetPage = false)
     {
-        var entries = await _repository.GetRecentEntriesAsync(500).ConfigureAwait(true);
-        Entries.Clear();
-        foreach (var entry in entries.OrderByDescending(e => e.CreatedUtc))
+        _entriesLoadCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _entriesLoadCancellation = cancellation;
+        IsEntriesLoading = true;
+        EntryQueryError = string.Empty;
+        var filter = _activeFilter;
+        var sort = _activeSort;
+        var descending = _activeDescending;
+        var requestedWeek = _weekStart;
+        try
         {
-            Entries.Add(TimeEntryViewModel.FromModel(entry));
+            var bounds = await _repository.GetEntryDateBoundsAsync(filter, cancellation.Token);
+            var latestDate = bounds.LastUtc?.ToLocalTime().Date ?? DateTime.Today;
+            if (!filter.IsActive && latestDate < DateTime.Today)
+            {
+                latestDate = DateTime.Today;
+            }
+            var newest = EntryWeek.Start(latestDate);
+            var oldest = EntryWeek.Start(bounds.FirstUtc?.ToLocalTime().Date ?? latestDate);
+            var week = resetPage ? newest : requestedWeek < oldest ? oldest : requestedWeek > newest ? newest : requestedWeek;
+            // Convert each local boundary separately so DST weeks need not be 168 hours in UTC.
+            var entries = await _repository.GetWeekEntriesAsync(filter, week.ToUniversalTime(), week.AddDays(7).ToUniversalTime(),
+                sort, descending, cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            _newestWeek = newest;
+            _oldestWeek = oldest;
+            _weekStart = week;
+            Entries.Clear();
+            foreach (var entry in entries)
+            {
+                Entries.Add(TimeEntryViewModel.FromModel(entry));
+            }
+            var total = TimeSpan.FromSeconds(entries.Where(e => !e.IsRunning).Sum(e => (long)e.DurationSeconds));
+            WeekPageText = $"{week:ddd, dd MMM yyyy} – {week.AddDays(6):ddd, dd MMM yyyy}   ·   Week {EntryWeek.Count(week, newest)} of {EntryWeek.Count(oldest, newest)}";
+            EntryPageSummary = $"{entries.Count} entries this week · {bounds.Count} matching entries overall · Week total: {(long)total.TotalHours} h {total.Minutes} min (completed entries)";
+            if (entries.Count == 0)
+            {
+                EntryPageSummary += " · No matching entries in this week.";
+            }
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // A newer refresh owns the list now.
+        }
+        catch (Exception ex)
+        {
+            if (_entriesLoadCancellation == cancellation)
+            {
+                EntryQueryError = $"Could not load entries: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (_entriesLoadCancellation == cancellation)
+            {
+                _entriesLoadCancellation = null;
+                IsEntriesLoading = false;
+                OlderWeekCommand.NotifyCanExecuteChanged();
+                NewerWeekCommand.NotifyCanExecuteChanged();
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplyEntryFiltersAsync()
+    {
+        if (FilterFromDate.HasValue && FilterToDate.HasValue && FilterFromDate.Value.Date > FilterToDate.Value.Date)
+        {
+            EntryQueryError = "From date must be on or before To date.";
+            return;
+        }
+        _activeFilter = new TimeEntryFilter
+        {
+            Description = FilterDescription.Trim(),
+            FromUtc = FilterFromDate?.Date.ToUniversalTime(),
+            ToUtcExclusive = FilterToDate?.Date.AddDays(1).ToUniversalTime(),
+            IsRunning = FilterStatus == "Running" ? true : FilterStatus == "Completed" ? false : null
+        };
+        _activeSort = SelectedEntrySort;
+        _activeDescending = SortDescending;
+        await LoadEntriesAsync(resetPage: true);
+    }
+
+    [RelayCommand]
+    private async Task ResetEntryFiltersAsync()
+    {
+        FilterDescription = string.Empty;
+        FilterFromDate = null;
+        FilterToDate = null;
+        FilterStatus = "All";
+        SelectedEntrySort = TimeEntrySort.Start;
+        SortDescending = true;
+        await ApplyEntryFiltersAsync();
+    }
+
+    private bool CanNavigateOlder() => !IsEntriesLoading && _weekStart > _oldestWeek;
+    private bool CanNavigateNewer() => !IsEntriesLoading && _weekStart < _newestWeek;
+
+    [RelayCommand(CanExecute = nameof(CanNavigateOlder))]
+    private async Task OlderWeekAsync()
+    {
+        _weekStart = _weekStart.AddDays(-7);
+        await LoadEntriesAsync();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanNavigateNewer))]
+    private async Task NewerWeekAsync()
+    {
+        _weekStart = _weekStart.AddDays(7);
+        await LoadEntriesAsync();
     }
 
     private async Task RestoreRunningTimerAsync()
     {
-        var entries = await _repository.GetRecentEntriesAsync(1).ConfigureAwait(true);
-        var running = entries.FirstOrDefault(e => e.IsRunning);
+        var running = await _repository.GetRunningEntryAsync().ConfigureAwait(true);
         if (running is null)
         {
             return;
@@ -151,6 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
         _runningStartUtc = running.StartUtc ?? DateTime.UtcNow;
         IsTimerRunning = true;
         RunningStatusText = $"Running: {running.Description}";
+        RunningDescription = running.Description;
         _runningTimer.IsEnabled = true;
         UpdateRunningDisplay();
     }
@@ -165,12 +336,18 @@ public sealed partial class MainViewModel : ObservableObject
         IsEditMode = true;
         AddButtonText = "Save";
         ManualDescription = value.Description;
+        RangeDescription = value.Description;
         ManualDuration = value.DurationText;
+        ManualStartDate = value.GroupDate;
+        RangeStartDate = value.GroupDate;
+        ManualStartTime = "00:00:00";
+        ManualEndTime = "00:00:00";
 
         if (value.StartUtc.HasValue)
         {
             var startLocal = value.StartUtc.Value.ToLocalTime();
             ManualStartDate = startLocal.Date;
+            RangeStartDate = startLocal.Date;
             ManualStartTime = startLocal.ToString("HH:mm:ss");
         }
 
@@ -192,6 +369,7 @@ public sealed partial class MainViewModel : ObservableObject
         _runningStartUtc = startUtc;
         IsTimerRunning = true;
         RunningStatusText = $"Running: {description}";
+        RunningDescription = description;
         _runningTimer.IsEnabled = true;
         UpdateRunningDisplay();
         await LoadEntriesAsync().ConfigureAwait(true);
@@ -248,18 +426,20 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var entries = await _repository.GetRecentEntriesAsync(100).ConfigureAwait(true);
-        var running = entries.FirstOrDefault(e => e.Id == _runningEntryId.Value && e.IsRunning);
-        if (running is null)
+        var id = _runningEntryId.Value;
+        var description = string.IsNullOrWhiteSpace(newDescription) ? DefaultTimerDescription : newDescription.Trim();
+        await _repository.UpdateRunningDescriptionAsync(id, description).ConfigureAwait(true);
+        if (_runningEntryId == id && IsTimerRunning)
         {
-            return;
+            RunningDescription = description;
+            RunningStatusText = $"Running: {description}";
+            UpdateRunningDisplay();
         }
-
-        running.Description = newDescription;
-        await _repository.UpdateEntryAsync(running).ConfigureAwait(true);
-        RunningStatusText = $"Running: {newDescription}";
         await LoadEntriesAsync().ConfigureAwait(true);
     }
+
+    [RelayCommand]
+    private Task SaveRunningDescriptionAsync() => UpdateRunningDescriptionAsync(RunningDescription);
 
     public void ToggleTimer()
     {
@@ -289,13 +469,21 @@ public sealed partial class MainViewModel : ObservableObject
             var entry = SelectedEntry.ToModel();
             entry.Description = description;
             entry.DurationSeconds = (int)duration.TotalSeconds;
+            var startLocal = ManualStartDate.Date + (entry.StartUtc?.ToLocalTime().TimeOfDay ?? TimeSpan.Zero);
+            entry.StartUtc = startLocal.ToUniversalTime();
+            if (entry.EndUtc.HasValue)
+            {
+                entry.EndUtc = entry.StartUtc.Value.Add(duration);
+            }
             await _repository.UpdateEntryAsync(entry).ConfigureAwait(true);
             CancelEdit();
         }
         else
         {
-            await _repository.AddDurationEntryAsync(description, duration).ConfigureAwait(true);
-            ClearManualFields();
+            await _repository.AddDurationEntryAsync(description, duration, ManualStartDate).ConfigureAwait(true);
+            ManualDescription = string.Empty;
+            ManualDuration = "00:00:00";
+            ManualStartDate = DateTime.Today;
         }
 
         await LoadEntriesAsync().ConfigureAwait(true);
@@ -310,8 +498,15 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var startLocal = ManualStartDate.Date + startTime;
-        var endLocal = ManualStartDate.Date + endTime;
+        if (startTime < TimeSpan.Zero || startTime >= TimeSpan.FromDays(1) ||
+            endTime < TimeSpan.Zero || endTime >= TimeSpan.FromDays(1))
+        {
+            MessageBox.Show("Start and end times must be within the selected day.", "Invalid Time", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var startLocal = RangeStartDate.Date + startTime;
+        var endLocal = RangeStartDate.Date + endTime;
 
         if (endLocal <= startLocal)
         {
@@ -319,7 +514,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var description = string.IsNullOrWhiteSpace(ManualDescription) ? DefaultTimerDescription : ManualDescription.Trim();
+        var description = string.IsNullOrWhiteSpace(RangeDescription) ? DefaultTimerDescription : RangeDescription.Trim();
 
         if (IsEditMode && SelectedEntry is not null)
         {
@@ -334,7 +529,10 @@ public sealed partial class MainViewModel : ObservableObject
         else
         {
             await _repository.AddManualRangeEntryAsync(description, startLocal, endLocal).ConfigureAwait(true);
-            ClearManualFields();
+            RangeDescription = string.Empty;
+            RangeStartDate = DateTime.Today;
+            ManualStartTime = "00:00:00";
+            ManualEndTime = "00:00:00";
         }
 
         await LoadEntriesAsync().ConfigureAwait(true);
@@ -594,6 +792,29 @@ public sealed partial class MainViewModel : ObservableObject
         IsManualSuggestionsOpen = ManualSuggestions.Count > 0;
     }
 
+    private async Task UpdateRangeSuggestionsAsync()
+    {
+        var search = RangeDescription;
+        RangeSuggestions.Clear();
+        IsRangeSuggestionsOpen = false;
+        if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
+        {
+            return;
+        }
+
+        var suggestions = await _repository.SearchDescriptionsAsync(search, 8).ConfigureAwait(true);
+        if (RangeDescription != search)
+        {
+            return;
+        }
+        RangeSuggestions.Clear();
+        foreach (var suggestion in suggestions)
+        {
+            RangeSuggestions.Add(suggestion);
+        }
+        IsRangeSuggestionsOpen = RangeSuggestions.Count > 0;
+    }
+
     private void LoadDefaultTimerDescription()
     {
         try
@@ -650,6 +871,8 @@ public sealed partial class MainViewModel : ObservableObject
         ManualDescription = string.Empty;
         ManualDuration = "00:00:00";
         ManualStartDate = DateTime.Today;
+        RangeDescription = string.Empty;
+        RangeStartDate = DateTime.Today;
         ManualStartTime = "00:00:00";
         ManualEndTime = "00:00:00";
     }

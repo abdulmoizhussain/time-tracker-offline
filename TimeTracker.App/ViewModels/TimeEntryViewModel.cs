@@ -23,7 +23,15 @@ public sealed partial class TimeEntryViewModel : ObservableObject
     [ObservableProperty]
     private bool _isRunning;
 
-    public DateTime GroupDate => StartUtc?.Date ?? EndUtc?.Date ?? DateTime.UtcNow.Date;
+    public DateTime CreatedUtc { get; init; }
+
+    public DateTime UpdatedUtc { get; init; }
+
+    public string CreatedLocalText => CreatedUtc.ToLocalTime().ToString("g");
+
+    public string ModifiedLocalText => UpdatedUtc.ToLocalTime().ToString("g");
+
+    public DateTime GroupDate => (StartUtc ?? EndUtc ?? CreatedUtc).ToLocalTime().Date;
 
     public string StartLocalText => StartUtc?.ToLocalTime().ToString("g") ?? string.Empty;
 
@@ -47,7 +55,9 @@ public sealed partial class TimeEntryViewModel : ObservableObject
             StartUtc = entry.StartUtc,
             EndUtc = entry.EndUtc,
             DurationSeconds = entry.DurationSeconds,
-            IsRunning = entry.IsRunning
+            IsRunning = entry.IsRunning,
+            CreatedUtc = entry.CreatedUtc,
+            UpdatedUtc = entry.UpdatedUtc
         };
     }
 
@@ -60,7 +70,9 @@ public sealed partial class TimeEntryViewModel : ObservableObject
             StartUtc = StartUtc,
             EndUtc = EndUtc,
             DurationSeconds = DurationSeconds,
-            IsRunning = IsRunning
+            IsRunning = IsRunning,
+            CreatedUtc = CreatedUtc,
+            UpdatedUtc = UpdatedUtc
         };
     }
 }

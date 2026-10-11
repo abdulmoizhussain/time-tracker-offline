@@ -4,6 +4,18 @@ This file preserves the original development backlog that was previously kept in
 
 ## Completed Recently
 
+- [x] Add Help → Usage with duration formats and guides for manual entry, timers, tray controls, filtering, sorting, and week navigation.
+
+- [x] Add Monday–Sunday pagination across all entries, with description/date/status filters and persistent sorting within daily groups (items 19 and 20).
+- [x] Show filtered daily and weekly completed-duration totals, week ranges, and matching-entry counts.
+
+- [x] Split duration and start/end manual entry into independent rows, each with Description and Start Date; honor the selected date for duration entries.
+
+- [x] Show Created and Modified timestamps in the entry list in local time.
+- [x] Position the tray popup near the clicked tray area with monitor/DPI-aware placement.
+- [x] Fix the tray popup's Open App action to restore the main window.
+- [x] Add explicit running-description editors with Save/Enter in the main window and tray popup (items 8 and 9).
+
 - [x] Fix startup `StackOverflowException` caused by the `OnStartup` handler sharing the protected method name.
 - [x] Fix icon/XAML resource load failure by loading the icon from disk at runtime.
 - [x] Fix `ListViewItem` style/resource lookup error.
@@ -41,9 +53,9 @@ This file preserves the original development backlog that was previously kept in
 
 7. Add a periodic pop-up reminder to stop the timer if it has been running for a long time, e.g. every 15 minutes. This helps avoid forgotten timers and keeps time-tracking data accurate.
 
-8. Allow modifying the description after starting the timer.
+8. [x] Allow modifying the description after starting the timer.
 
-9. Allow modifying the ongoing timer from the tray icon mini window.
+9. [x] Allow modifying the ongoing timer description from the tray icon mini window.
 
 10. Add a right-click context menu to copy the description to the clipboard.
 
@@ -72,9 +84,9 @@ This file preserves the original development backlog that was previously kept in
 
 18. Maintain database versioning and show the current database version in the About window.
 
-19. Implement pagination for large numbers of entries. Each page should show entries from Monday to Sunday. If the current date is Monday, the first page contains only that day; older entries go to the next page, which shows the complete previous week.
+19. [x] Implement Monday–Sunday week pagination with Older/Newer navigation, including empty weeks and access beyond the former 500-entry limit.
 
-20. After week-wise pagination, show the total duration tracked for each day in the list view and the total duration for the current week in the group row of each week.
+20. [x] Show filtered daily totals in group headers and the displayed week's total in the pagination summary.
 
 21. Detect if an instance of the app is already running; if so, activate the existing instance instead of opening a new one.
 

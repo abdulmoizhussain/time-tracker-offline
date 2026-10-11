@@ -84,6 +84,21 @@ public sealed class TimeEntryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task AddDurationEntryAsync_SelectedDateIsPreservedInLocalGrouping()
+    {
+        var selectedDate = new DateTime(2024, 1, 15);
+        await _repository.AddDurationEntryAsync("Backdated duration", TimeSpan.FromMinutes(45), selectedDate);
+
+        var entry = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.Equal(selectedDate, entry.StartUtc!.Value.ToLocalTime().Date);
+        Assert.Equal(2700, entry.DurationSeconds);
+        Assert.Null(entry.EndUtc);
+        Assert.False(entry.IsRunning);
+        Assert.Equal(selectedDate, TimeTracker.App.ViewModels.TimeEntryViewModel.FromModel(entry).GroupDate);
+        Assert.True(entry.CreatedUtc > entry.StartUtc.Value);
+    }
+
+    [Fact]
     public async Task UpdateEntryAsync_UpdatesEntry()
     {
         var id = await _repository.AddDurationEntryAsync("Original", TimeSpan.FromMinutes(10));
@@ -103,6 +118,32 @@ public sealed class TimeEntryRepositoryTests : IDisposable
         await _repository.DeleteEntryAsync(id);
         var entries = await _repository.GetRecentEntriesAsync(10);
         Assert.Empty(entries);
+    }
+
+    [Fact]
+    public async Task UpdateRunningDescriptionAsync_PreservesTimerAndCreationTime()
+    {
+        var start = DateTime.UtcNow.AddMinutes(-5);
+        var id = await _repository.StartTimerAsync("Original", start);
+        var original = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+
+        await _repository.UpdateRunningDescriptionAsync(id, "Renamed");
+
+        var renamed = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.Equal("Renamed", renamed.Description);
+        Assert.True(renamed.IsRunning);
+        Assert.Equal(original.StartUtc, renamed.StartUtc);
+        Assert.Equal(original.CreatedUtc, renamed.CreatedUtc);
+        Assert.Equal(original.DurationSeconds, renamed.DurationSeconds);
+        Assert.Null(renamed.EndUtc);
+        Assert.True(renamed.UpdatedUtc >= original.UpdatedUtc);
+
+        await _repository.StopTimerAsync(id, start.AddMinutes(5));
+        await _repository.UpdateRunningDescriptionAsync(id, "Late rename");
+        var stopped = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.Equal("Renamed", stopped.Description);
+        Assert.False(stopped.IsRunning);
+        Assert.Equal(300, stopped.DurationSeconds);
     }
 
     [Fact]

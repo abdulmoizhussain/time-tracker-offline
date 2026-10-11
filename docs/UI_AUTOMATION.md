@@ -14,11 +14,25 @@ This document lists the `AutomationProperties.AutomationId` values exposed by Ti
 | Manual duration box | `ManualDurationTextBox` | TextBox | Duration input for manual entries. |
 | Add Duration button | `AddDurationButton` | Button | Adds a single duration entry. |
 | Add Range button | `AddRangeButton` | Button | Adds an entry from start/end date-time. |
+| Duration start date | `DurationStartDatePicker` | DatePicker | Date for the duration row. |
+| Range description | `RangeDescriptionTextBox` | TextBox | Independent description for the start/end row. |
+| Range start date | `RangeStartDatePicker` | DatePicker | Date for the start/end row. |
+| Range start time | `RangeStartTimeTextBox` | TextBox | Start time on the selected day. |
+| Range end time | `RangeEndTimeTextBox` | TextBox | End time on the selected day. |
+| Description filter | `EntryDescriptionFilter` | TextBox | Literal substring filter. |
+| From/To date filters | `EntryFromDateFilter`, `EntryToDateFilter` | DatePicker | Inclusive local dates. |
+| Status filter | `EntryStatusFilter` | ComboBox | All, Running, Completed. |
+| Sort field | `EntrySortField` | ComboBox | Sort within daily groups. |
+| Apply/Reset filters | `ApplyEntryFiltersButton`, `ResetEntryFiltersButton` | Button | Reload the first matching/default week. |
+| Older/Newer week | `OlderWeekButton`, `NewerWeekButton` | Button | Disabled at navigation boundaries or during loading. |
+| Week label | `WeekPageLabel` | TextBlock | Date range and week number. |
+| Entry list | `EntriesListView` | ListView | Entries for the selected week. |
+| Page summary | `EntryPageSummary` | TextBlock | Counts and filtered completed-duration total. |
 
 ### Notes
 
 - The Start/Stop buttons occupy the same cell in the layout and toggle visibility based on `IsTimerRunning`. UI tests should look for whichever button is appropriate for the current state.
-- The timer description box and the entries list-view do **not** yet have automation IDs. Add them before writing tests that interact with those areas.
+- The timer description box does **not** yet have an automation ID. Add one before writing tests that interact with it.
 
 ---
 
