@@ -25,6 +25,26 @@ public sealed partial class MainViewModel : ObservableObject
 
     private int? _runningEntryId;
     private DateTime _runningStartUtc;
+    private bool _sessionLocked;
+    private bool _recoveryPending;
+    private bool _checkpointSaving;
+    private DateTime _lastCheckpointUtc;
+    private TimerInterruption? _pendingInterruption;
+
+    [ObservableProperty]
+    private string _timerInitialDuration = string.Empty;
+
+    [ObservableProperty]
+    private string _timerError = string.Empty;
+
+    [ObservableProperty]
+    private int _timerSuggestionIndex = -1;
+
+    [ObservableProperty]
+    private int _manualSuggestionIndex = -1;
+
+    [ObservableProperty]
+    private int _rangeSuggestionIndex = -1;
     private TimeEntryFilter _activeFilter = new();
     private TimeEntrySort _activeSort = TimeEntrySort.Start;
     private bool _activeDescending = true;
@@ -417,6 +437,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         _runningEntryId = running.Id;
         _runningStartUtc = running.StartUtc ?? DateTime.UtcNow;
+        _recoveryPending = true;
         IsTimerRunning = true;
         RunningStatusText = $"Running: {running.Description}";
         _runningTimer.IsEnabled = true;
@@ -458,17 +479,31 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task StartTimerAsync()
     {
+        if (IsTimerRunning) return;
+        TimerError = string.Empty;
+        if (!TimerInput.TryInitialDuration(TimerInitialDuration, out var initialDuration))
+        {
+            TimerError = "Enter an initial duration from 0 to 23:59:59, using the same formats as manual duration. Leave blank to start from zero.";
+            return;
+        }
         var description = string.IsNullOrWhiteSpace(TimerDescription) ? DefaultTimerDescription : TimerDescription.Trim();
-        var startUtc = DateTime.UtcNow;
+        // AR-022: an initial duration may temporarily backdate Start into the previous day.
+        var startUtc = DateTime.UtcNow - initialDuration;
         var id = await _repository.StartTimerAsync(description, startUtc).ConfigureAwait(true);
 
         _runningEntryId = id;
         _runningStartUtc = startUtc;
+        _recoveryPending = false;
+        _pendingInterruption = null;
+        TimerInitialDuration = string.Empty;
         IsTimerRunning = true;
         RunningStatusText = $"Running: {description}";
         _runningTimer.IsEnabled = true;
         UpdateRunningDisplay();
         await LoadEntriesAsync().ConfigureAwait(true);
+        UpdateRunningDisplay();
+        try { await CaptureTimerInterruptionAsync(TimerInterruptionReason.LastSeen, DateTime.UtcNow); }
+        catch (Exception ex) { TimerError = $"The timer started, but recovery information could not be saved: {ex.Message}"; }
     }
 
     [RelayCommand]
@@ -479,10 +514,18 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var endUtc = DateTime.UtcNow;
-        await _repository.StopTimerAsync(_runningEntryId.Value, endUtc).ConfigureAwait(true);
+        await StopRunningTimerAtAsync(_runningEntryId.Value, DateTime.UtcNow);
+    }
+
+    private async Task StopRunningTimerAtAsync(int entryId, DateTime endUtc)
+    {
+        if (_runningEntryId != entryId) return;
+        await _repository.StopTimerAsync(entryId, endUtc).ConfigureAwait(true);
 
         _runningEntryId = null;
+        _recoveryPending = false;
+        _pendingInterruption = null;
+        TimerError = string.Empty;
         IsTimerRunning = false;
         RunningElapsedText = "00:00:00";
         RunningStatusText = "No running timer.";
@@ -493,9 +536,16 @@ public sealed partial class MainViewModel : ObservableObject
         await LoadEntriesAsync().ConfigureAwait(true);
     }
 
-    private void OnRunningTimerTick(object? sender, EventArgs e)
+    private async void OnRunningTimerTick(object? sender, EventArgs e)
     {
         UpdateRunningDisplay();
+        if (!_sessionLocked && !_recoveryPending && !_checkpointSaving && DateTime.UtcNow - _lastCheckpointUtc >= TimeSpan.FromSeconds(30))
+        {
+            _checkpointSaving = true;
+            try { await CaptureTimerInterruptionAsync(TimerInterruptionReason.LastSeen, DateTime.UtcNow); }
+            catch (Exception ex) { TimerError = $"Could not save timer recovery information: {ex.Message}"; }
+            finally { _checkpointSaving = false; }
+        }
     }
 
     private void UpdateRunningDisplay()
@@ -506,6 +556,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         var elapsed = DateTime.UtcNow - _runningStartUtc;
+        foreach (var entry in Entries.Where(e => e.Id == _runningEntryId && e.IsRunning))
+            entry.DurationSeconds = (int)Math.Clamp(elapsed.Ticks / TimeSpan.TicksPerSecond, 0, int.MaxValue);
         RunningElapsedText = DurationFormatter.Clock(elapsed.Ticks / TimeSpan.TicksPerSecond);
         var description = RunningStatusText.StartsWith("Running: ", StringComparison.Ordinal)
             ? RunningStatusText.Substring("Running: ".Length)
@@ -533,7 +585,7 @@ public sealed partial class MainViewModel : ObservableObject
         ManualDurationError = string.Empty;
         if (!ManualEntryValidation.TryDuration(ManualDuration, out var duration))
         {
-            ManualDurationError = "Enter a duration from 1 second to 24 hours. Whole numbers mean minutes; decimals mean hours. Use minutes:seconds or hours:minutes:seconds (components 00–59).";
+            ManualDurationError = "Enter a duration from 1 second to 23:59:59. Whole numbers mean minutes; decimals mean hours. Use minutes:seconds or hours:minutes:seconds (components 00–59).";
             return;
         }
         if (!ManualStartDate.HasValue)
@@ -548,29 +600,29 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         var description = string.IsNullOrWhiteSpace(ManualDescription) ? DefaultTimerDescription : ManualDescription.Trim();
+        var preferredTime = IsEditMode && SelectedEntry is not null
+            ? SelectedEntry.StartUtc?.ToLocalTime().TimeOfDay ?? DateTime.Now.TimeOfDay
+            : DateTime.Now.TimeOfDay;
+        if (!ManualEntryValidation.TryDurationRange(ManualStartDate.Value, preferredTime, duration,
+                out var startLocal, out var endLocal))
+        {
+            ManualDurationError = "Duration must fit on the selected day by 23:59:59 (maximum 23:59:59). Clock-change gaps or repeated hours are not supported.";
+            return;
+        }
 
         if (IsEditMode && SelectedEntry is not null)
         {
             var entry = SelectedEntry.ToModel();
             entry.Description = description;
             entry.DurationSeconds = (int)duration.TotalSeconds;
-            var startLocal = ManualStartDate.Value.Date + (entry.StartUtc?.ToLocalTime().TimeOfDay ?? TimeSpan.Zero);
             entry.StartUtc = startLocal.ToUniversalTime();
-            if (entry.EndUtc.HasValue)
-            {
-                if (entry.StartUtc.Value > DateTime.MaxValue.Subtract(duration))
-                {
-                    ManualDurationError = "The selected date and duration exceed the supported date range.";
-                    return;
-                }
-                entry.EndUtc = entry.StartUtc.Value.Add(duration);
-            }
+            entry.EndUtc = endLocal.ToUniversalTime();
             await _repository.UpdateEntryAsync(entry).ConfigureAwait(true);
             CancelEdit();
         }
         else
         {
-            await _repository.AddDurationEntryAsync(description, duration, ManualStartDate.Value).ConfigureAwait(true);
+            await _repository.AddManualRangeEntryAsync(description, startLocal, endLocal).ConfigureAwait(true);
             ManualDescription = string.Empty;
             ManualDuration = "00:00:00";
             ManualStartDate = DateTime.Today;
@@ -692,6 +744,9 @@ public sealed partial class MainViewModel : ObservableObject
     private void ResetRunningState()
     {
         _runningEntryId = null;
+        _pendingInterruption = null;
+        _recoveryPending = false;
+        TimerError = string.Empty;
         IsTimerRunning = false;
         _runningTimer.IsEnabled = false;
         RunningStatusText = "No running timer.";
@@ -902,79 +957,192 @@ public sealed partial class MainViewModel : ObservableObject
         SaveDefaultTimerDescription();
     }
 
-    public async Task RecordSessionEventAsync(string eventType)
+    public async Task RecordSessionEventAsync(string eventType, DateTime? occurredUtc = null)
     {
         if (!_options.SessionEvents.Enabled)
         {
             return;
         }
 
-        await _sessionEventRepository.RecordSessionEventAsync(eventType, DateTime.UtcNow).ConfigureAwait(true);
+        await _sessionEventRepository.RecordSessionEventAsync(eventType, occurredUtc ?? DateTime.UtcNow).ConfigureAwait(true);
     }
 
-    private async Task UpdateTimerSuggestionsAsync()
+    public async Task CaptureTimerInterruptionAsync(TimerInterruptionReason reason, DateTime occurredUtc)
     {
-        var search = TimerDescription;
-        TimerSuggestions.Clear();
-        IsTimerSuggestionsOpen = false;
-
-        if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
-        {
-            return;
-        }
-
-        var suggestions = await _repository.SearchDescriptionsAsync(search, 8).ConfigureAwait(true);
-        foreach (var suggestion in suggestions)
-        {
-            TimerSuggestions.Add(suggestion);
-        }
-
-        IsTimerSuggestionsOpen = TimerSuggestions.Count > 0;
+        if (reason == TimerInterruptionReason.Lock) _sessionLocked = true;
+        if (reason is TimerInterruptionReason.Exit or TimerInterruptionReason.Shutdown) _recoveryPending = true;
+        if (!_runningEntryId.HasValue) return;
+        var interruption = new TimerInterruption(_runningEntryId.Value, reason, occurredUtc);
+        if (reason != TimerInterruptionReason.LastSeen) _pendingInterruption = interruption;
+        await _repository.SaveTimerInterruptionAsync(interruption);
+        _lastCheckpointUtc = occurredUtc;
     }
 
-    private async Task UpdateManualSuggestionsAsync()
+    public void OnSessionUnlocked() => _sessionLocked = false;
+
+    public async Task<(TimeEntry Entry, TimerInterruption Interruption)?> GetUnfinishedTimerAsync(bool startup)
     {
-        var search = ManualDescription;
-        ManualSuggestions.Clear();
-        IsManualSuggestionsOpen = false;
-
-        if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
-        {
-            return;
-        }
-
-        var suggestions = await _repository.SearchDescriptionsAsync(search, 8).ConfigureAwait(true);
-        foreach (var suggestion in suggestions)
-        {
-            ManualSuggestions.Add(suggestion);
-        }
-
-        IsManualSuggestionsOpen = ManualSuggestions.Count > 0;
+        if (!startup && _sessionLocked) return null;
+        var entry = await _repository.GetRunningEntryAsync();
+        if (entry is null || entry.Id != _runningEntryId) return null;
+        var interruption = _pendingInterruption?.EntryId == entry.Id ? _pendingInterruption : await _repository.GetTimerInterruptionAsync(entry.Id);
+        if (!startup && interruption?.Reason != TimerInterruptionReason.Lock) return null;
+        _recoveryPending = true;
+        return (entry, interruption ?? new TimerInterruption(entry.Id, TimerInterruptionReason.Unknown, null));
     }
 
-    private async Task UpdateRangeSuggestionsAsync()
+    public async Task ResolveUnfinishedTimerAsync(TimerInterruption interruption, bool stop, bool atRecordedTime)
     {
-        var search = RangeDescription;
-        RangeSuggestions.Clear();
-        IsRangeSuggestionsOpen = false;
-        if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
+        if (interruption.EntryId != _runningEntryId) return;
+        if (stop)
         {
-            return;
+            var endUtc = atRecordedTime ? interruption.OccurredUtc ?? throw new InvalidOperationException("No interruption time was recorded.") : DateTime.UtcNow;
+            await StopRunningTimerAtAsync(interruption.EntryId, endUtc);
         }
-
-        var suggestions = await _repository.SearchDescriptionsAsync(search, 8).ConfigureAwait(true);
-        if (RangeDescription != search)
+        else
         {
-            return;
+            if (interruption.OccurredUtc.HasValue)
+                await _repository.ClearTimerInterruptionAsync(interruption.EntryId, interruption.OccurredUtc);
+            // A second lock while the dialog was open must not be acknowledged by an older Continue action.
+            if (_pendingInterruption is not null && _pendingInterruption != interruption) return;
+            _pendingInterruption = null;
+            _recoveryPending = false;
+            await CaptureTimerInterruptionAsync(TimerInterruptionReason.LastSeen, DateTime.UtcNow);
         }
-        RangeSuggestions.Clear();
-        foreach (var suggestion in suggestions)
-        {
-            RangeSuggestions.Add(suggestion);
-        }
-        IsRangeSuggestionsOpen = RangeSuggestions.Count > 0;
     }
 
+    [RelayCommand]
+    private void CopyEntryDescription(TimeEntryViewModel entry)
+        => System.Windows.Clipboard.SetText(entry.Description);
+
+    private bool _selectingSuggestion;
+    private int _timerSuggestionVersion;
+    private int _manualSuggestionVersion;
+    private int _rangeSuggestionVersion;
+
+    public void SelectDescriptionSuggestion(string field, string description)
+    {
+        _selectingSuggestion = true;
+        try
+        {
+            switch (field)
+            {
+                case "Timer":
+                    ++_timerSuggestionVersion;
+                    TimerDescription = description;
+                    IsTimerSuggestionsOpen = false;
+                    break;
+                case "Manual":
+                    ++_manualSuggestionVersion;
+                    ManualDescription = description;
+                    IsManualSuggestionsOpen = false;
+                    break;
+                case "Range":
+                    ++_rangeSuggestionVersion;
+                    RangeDescription = description;
+                    IsRangeSuggestionsOpen = false;
+                    break;
+            }
+        }
+        finally { _selectingSuggestion = false; }
+    }
+
+    private Task UpdateTimerSuggestionsAsync() => LoadDescriptionSuggestionsAsync("Timer", false);
+    private Task UpdateManualSuggestionsAsync() => LoadDescriptionSuggestionsAsync("Manual", false);
+    private Task UpdateRangeSuggestionsAsync() => LoadDescriptionSuggestionsAsync("Range", false);
+
+    public Task ShowRecentDescriptionSuggestionsAsync(string field) => LoadDescriptionSuggestionsAsync(field, true);
+
+    private string DescriptionFor(string field) => field switch
+    {
+        "Timer" => TimerDescription, "Manual" => ManualDescription, "Range" => RangeDescription,
+        _ => throw new ArgumentOutOfRangeException(nameof(field))
+    };
+
+    private ObservableCollection<string> SuggestionsFor(string field) => field switch
+    {
+        "Timer" => TimerSuggestions, "Manual" => ManualSuggestions, "Range" => RangeSuggestions,
+        _ => throw new ArgumentOutOfRangeException(nameof(field))
+    };
+
+    private int NextSuggestionVersion(string field) => field switch
+    {
+        "Timer" => ++_timerSuggestionVersion, "Manual" => ++_manualSuggestionVersion, "Range" => ++_rangeSuggestionVersion,
+        _ => throw new ArgumentOutOfRangeException(nameof(field))
+    };
+
+    private int SuggestionVersion(string field) => field switch
+    {
+        "Timer" => _timerSuggestionVersion, "Manual" => _manualSuggestionVersion, "Range" => _rangeSuggestionVersion,
+        _ => throw new ArgumentOutOfRangeException(nameof(field))
+    };
+
+    public bool SuggestionsOpen(string field) => field switch
+    {
+        "Timer" => IsTimerSuggestionsOpen, "Manual" => IsManualSuggestionsOpen, "Range" => IsRangeSuggestionsOpen,
+        _ => false
+    };
+
+    private int SuggestionIndex(string field) => field switch
+    {
+        "Timer" => TimerSuggestionIndex, "Manual" => ManualSuggestionIndex, "Range" => RangeSuggestionIndex,
+        _ => -1
+    };
+
+    private void SetSuggestionState(string field, bool open, int index)
+    {
+        switch (field)
+        {
+            case "Timer": TimerSuggestionIndex = index; IsTimerSuggestionsOpen = open; break;
+            case "Manual": ManualSuggestionIndex = index; IsManualSuggestionsOpen = open; break;
+            case "Range": RangeSuggestionIndex = index; IsRangeSuggestionsOpen = open; break;
+        }
+    }
+
+    public void CloseDescriptionSuggestions(string field)
+    {
+        NextSuggestionVersion(field);
+        SetSuggestionState(field, false, -1);
+    }
+
+    public void MoveDescriptionSuggestion(string field, int direction)
+    {
+        var items = SuggestionsFor(field);
+        if (items.Count == 0) return;
+        SetSuggestionState(field, true, Math.Clamp(SuggestionIndex(field) + direction, 0, items.Count - 1));
+    }
+
+    public void AcceptDescriptionSuggestion(string field)
+    {
+        var items = SuggestionsFor(field);
+        var index = SuggestionIndex(field);
+        if (index >= 0 && index < items.Count) SelectDescriptionSuggestion(field, items[index]);
+    }
+
+    private async Task LoadDescriptionSuggestionsAsync(string field, bool recent)
+    {
+        var version = NextSuggestionVersion(field);
+        if (_selectingSuggestion) return;
+        var search = DescriptionFor(field);
+        var items = SuggestionsFor(field);
+        items.Clear();
+        SetSuggestionState(field, false, -1);
+        if (recent ? !string.IsNullOrWhiteSpace(search) : string.IsNullOrWhiteSpace(search) || search.Length < 2) return;
+        try
+        {
+            var descriptions = recent
+                ? (await _repository.GetRecentEntriesAsync(5)).Select(e => e.Description).ToList()
+                : await _repository.SearchDescriptionsAsync(search, 8);
+            if (version != SuggestionVersion(field) || search != DescriptionFor(field)) return;
+            foreach (var description in descriptions) items.Add(description);
+            SetSuggestionState(field, items.Count > 0, items.Count > 0 ? 0 : -1);
+        }
+        catch (Exception ex)
+        {
+            // A failed optional suggestion query must not prevent typing or create an unobserved task failure.
+            System.Diagnostics.Trace.WriteLine($"Description suggestions: {ex}");
+        }
+    }
     private void LoadDefaultTimerDescription()
     {
         try

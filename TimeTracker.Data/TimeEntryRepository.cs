@@ -44,6 +44,19 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             await ApplyVersion2Async(connection, cancellationToken).ConfigureAwait(false);
         }
 
+        if (version < 3)
+        {
+            const string migrationSql = """
+                CREATE TABLE IF NOT EXISTS TimerInterruptions (
+                    EntryId INTEGER PRIMARY KEY REFERENCES TimeEntries(Id) ON DELETE CASCADE,
+                    Reason TEXT NOT NULL CHECK(Reason IN ('LastSeen', 'Lock', 'Exit', 'Shutdown')),
+                    OccurredUtc TEXT NOT NULL
+                );
+                PRAGMA user_version = 3;
+                """;
+            await connection.ExecuteAsync(new CommandDefinition(migrationSql, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
         const string effectiveDateIndexSql = """
             CREATE INDEX IF NOT EXISTS IX_TimeEntries_EffectiveUtc
             ON TimeEntries(COALESCE(StartUtc, EndUtc, CreatedUtc));
@@ -159,6 +172,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
                 IsRunning = 0,
                 UpdatedUtc = @UpdatedUtc
             WHERE Id = @Id AND IsRunning = 1;
+            DELETE FROM TimerInterruptions WHERE EntryId = @Id;
             """;
 
         using var connection = _connectionFactory.CreateConnection();
@@ -338,7 +352,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
         const string sql = """
             SELECT Id, Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc
             FROM TimeEntries
-            ORDER BY CreatedUtc DESC
+            ORDER BY CreatedUtc DESC, Id DESC
             LIMIT @Take;
             """;
 
@@ -425,7 +439,7 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
     {
         const string sql = """
             SELECT Id, Description, StartUtc, EndUtc, DurationSeconds, IsRunning, CreatedUtc, UpdatedUtc
-            FROM TimeEntries WHERE IsRunning = 1 ORDER BY CreatedUtc DESC, Id DESC LIMIT 1;
+            FROM TimeEntries WHERE IsRunning = 1 ORDER BY CreatedUtc DESC, Id DESC, Id DESC LIMIT 1;
             """;
         using var connection = _connectionFactory.CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -457,6 +471,53 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             new CommandDefinition(sql, new { Pattern = $"%{search}%", Take = take }, cancellationToken: cancellationToken))
             .ConfigureAwait(false);
         return descriptions.ToList();
+    }
+
+    public async Task SaveTimerInterruptionAsync(TimerInterruption interruption, CancellationToken cancellationToken = default)
+    {
+        if (!interruption.OccurredUtc.HasValue || interruption.Reason == TimerInterruptionReason.Unknown ||
+            !Enum.IsDefined(interruption.Reason)) throw new ArgumentException("A recorded interruption needs a known reason and timestamp.", nameof(interruption));
+        const string sql = """
+            INSERT INTO TimerInterruptions (EntryId, Reason, OccurredUtc)
+            SELECT Id, @Reason, @OccurredUtc FROM TimeEntries WHERE Id = @EntryId AND IsRunning = 1
+            ON CONFLICT(EntryId) DO UPDATE SET Reason = excluded.Reason, OccurredUtc = excluded.OccurredUtc
+            WHERE excluded.OccurredUtc >= TimerInterruptions.OccurredUtc
+              AND (excluded.Reason != 'LastSeen' OR TimerInterruptions.Reason = 'LastSeen');
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            interruption.EntryId, Reason = interruption.Reason.ToString(), OccurredUtc = ToUtcString(interruption.OccurredUtc.Value)
+        }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<TimerInterruption?> GetTimerInterruptionAsync(int entryId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT i.EntryId, i.Reason, i.OccurredUtc FROM TimerInterruptions i
+            JOIN TimeEntries e ON e.Id = i.EntryId WHERE i.EntryId = @EntryId AND e.IsRunning = 1;
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var row = await connection.QueryFirstOrDefaultAsync<InterruptionDto>(new CommandDefinition(sql,
+            new { EntryId = entryId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row is null ? null : new TimerInterruption(row.EntryId, Enum.Parse<TimerInterruptionReason>(row.Reason), ParseUtc(row.OccurredUtc));
+    }
+
+    public async Task ClearTimerInterruptionAsync(int entryId, DateTime? throughUtc = null, CancellationToken cancellationToken = default)
+    {
+        const string sql = "DELETE FROM TimerInterruptions WHERE EntryId = @EntryId AND (@ThroughUtc IS NULL OR OccurredUtc <= @ThroughUtc);";
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(sql, new { EntryId = entryId, ThroughUtc = throughUtc.HasValue ? ToUtcString(throughUtc.Value) : null }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    private sealed class InterruptionDto
+    {
+        public int EntryId { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public string OccurredUtc { get; set; } = string.Empty;
     }
     public async Task<int> GetDatabaseVersionAsync(CancellationToken cancellationToken = default)
     {

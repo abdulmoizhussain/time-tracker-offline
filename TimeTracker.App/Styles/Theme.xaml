@@ -106,12 +106,40 @@
         <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
         <Setter Property="MinHeight" Value="28" />
         <Setter Property="Padding" Value="0" />
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DatePicker">
+            <Border x:Name="DateChrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1" CornerRadius="6" Padding="6,0,2,0">
+                <Grid x:Name="PART_Root">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <DatePickerTextBox x:Name="PART_TextBox" Style="{DynamicResource {x:Type DatePickerTextBox}}"
+                                       Background="Transparent" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                    <Button x:Name="PART_Button" Grid.Column="1" Content="▦" FontSize="16" Width="24" Height="24"
+                            MinWidth="0" MinHeight="0" Padding="0" Margin="2,0,0,0" VerticalAlignment="Center"
+                            Focusable="False" AutomationProperties.Name="Choose date" />
+                    <Popup x:Name="PART_Popup" Placement="Bottom" StaysOpen="False" AllowsTransparency="True" />
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="DateChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="DateChrome" Property="Opacity" Value="0.55" /></Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style TargetType="DatePickerTextBox">
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
-        <Setter Property="Padding" Value="2,1" />
-        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="Padding" Value="2,0" />
+        <Setter Property="MinHeight" Value="20" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DatePickerTextBox">
+            <Grid>
+                <ScrollViewer x:Name="PART_ContentHost" />
+                <ContentControl x:Name="PART_Watermark" IsHitTestVisible="False" Focusable="False"
+                                Foreground="{DynamicResource MutedBrush}" Margin="2,0" VerticalAlignment="Center" Visibility="Collapsed" />
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="Text" Value=""><Setter TargetName="PART_Watermark" Property="Visibility" Value="Visible" /></Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style TargetType="ComboBox">
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
@@ -169,7 +197,7 @@
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
         <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         <Setter Property="Background" Value="{DynamicResource CanvasBrush}" />
-        <Setter Property="Padding" Value="8,5" />
+        <Setter Property="Padding" Value="8,2" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GridViewColumnHeader">
             <Grid>

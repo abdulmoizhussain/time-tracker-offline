@@ -194,6 +194,7 @@ public partial class App : System.Windows.Application
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
         mainWindow.InitializeForLaunch(WindowsStartupRegistration.IsStartupLaunch(e.Args));
+        await mainWindow.ShowUnfinishedTaskAsync(startup: true);
     }
 
     private void OnActivateRequested(object? state, bool timedOut)
@@ -213,6 +214,13 @@ public partial class App : System.Windows.Application
             MainWindow?.Activate();
             MainWindow?.Focus();
         });
+    }
+
+    private async void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
+    {
+        if (MainWindow is not TimeTracker.App.MainWindow mainWindow) return;
+        try { await mainWindow.RecordSystemShutdownAsync(); }
+        catch (Exception ex) { LogException(ex, "Shutdown timer checkpoint"); }
     }
 
     private async void OnExit(object sender, ExitEventArgs e)

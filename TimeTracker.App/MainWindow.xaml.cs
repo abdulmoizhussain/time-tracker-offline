@@ -6,8 +6,10 @@ using System.Windows.Controls;
 using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using TimeTracker.App.ViewModels;
 using TimeTracker.App.Helpers;
+using TimeTracker.Core.Models;
 using Application = System.Windows.Application;
 
 namespace TimeTracker.App;
@@ -20,6 +22,8 @@ public partial class MainWindow : Window
     private TrayPopupWindow? _trayPopup;
     private ToolStripMenuItem? _startupTrayMenuItem;
     private bool _isExiting;
+    private bool _showingUnfinishedTimer;
+    private UnfinishedTimerWindow? _unfinishedTimerWindow;
 
     public MainWindow(ScreenEventsWindow screenEventsWindow, ImportExportHistoryWindow importExportHistoryWindow)
     {
@@ -188,8 +192,12 @@ public partial class MainWindow : Window
 
     private async void ExitApplication()
     {
-        await ViewModel.SaveEntryQueryPreferencesAsync();
+        if (_isExiting) return;
         _isExiting = true;
+        _unfinishedTimerWindow?.Close();
+        try { await ViewModel.CaptureTimerInterruptionAsync(TimerInterruptionReason.Exit, DateTime.UtcNow); }
+        catch (Exception ex) { System.Windows.MessageBox.Show($"Could not record the exit time: {ex.Message}", "Timer recovery"); }
+        await ViewModel.SaveEntryQueryPreferencesAsync();
         _notifyIcon?.Dispose();
         Application.Current.Shutdown();
     }
@@ -216,6 +224,7 @@ public partial class MainWindow : Window
 
     private async void OnSessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e)
     {
+        var occurredUtc = DateTime.UtcNow;
         var eventType = e.Reason switch
         {
             Microsoft.Win32.SessionSwitchReason.SessionLock => "Lock",
@@ -223,10 +232,65 @@ public partial class MainWindow : Window
             _ => null
         };
 
-        if (eventType is not null && DataContext is MainViewModel viewModel)
+        if (eventType is not null && !Dispatcher.HasShutdownStarted)
         {
-            await viewModel.RecordSessionEventAsync(eventType).ConfigureAwait(false);
+            try
+            {
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    if (_isExiting || DataContext is not MainViewModel viewModel) return;
+                    if (eventType == "Lock")
+                    {
+                        try { await viewModel.CaptureTimerInterruptionAsync(TimerInterruptionReason.Lock, occurredUtc); }
+                        catch (Exception ex) { viewModel.TimerError = $"Could not save lock time: {ex.Message}"; }
+                    }
+                    else viewModel.OnSessionUnlocked();
+                    try { await viewModel.RecordSessionEventAsync(eventType, occurredUtc); }
+                    catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"Session history: {ex}"); }
+                    if (eventType == "Unlock") await ShowUnfinishedTaskAsync(startup: false);
+                }).Task.Unwrap();
+            }
+            catch (TaskCanceledException) when (_isExiting || Dispatcher.HasShutdownStarted) { }
         }
+    }
+
+    public async Task RecordSystemShutdownAsync()
+    {
+        _isExiting = true;
+        _unfinishedTimerWindow?.Close();
+        await ViewModel.CaptureTimerInterruptionAsync(TimerInterruptionReason.Shutdown, DateTime.UtcNow);
+    }
+
+    public async Task ShowUnfinishedTaskAsync(bool startup)
+    {
+        if (_showingUnfinishedTimer || _isExiting) return;
+        _showingUnfinishedTimer = true;
+        try
+        {
+            while (!_isExiting)
+            {
+                var unfinished = await ViewModel.GetUnfinishedTimerAsync(startup);
+                startup = false;
+                if (unfinished is null || _isExiting) return;
+                var (entry, interruption) = unfinished.Value;
+                _unfinishedTimerWindow = new UnfinishedTimerWindow(entry.Description, interruption);
+                if (IsVisible)
+                {
+                    _unfinishedTimerWindow.Owner = this;
+                    _unfinishedTimerWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
+                _unfinishedTimerWindow.ShowDialog();
+                if (_isExiting) return;
+                await ViewModel.ResolveUnfinishedTimerAsync(interruption,
+                    _unfinishedTimerWindow.Action != UnfinishedTimerAction.Continue,
+                    _unfinishedTimerWindow.Action == UnfinishedTimerAction.StopAtRecordedTime);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!_isExiting) System.Windows.MessageBox.Show($"Could not resolve the unfinished task: {ex.Message}", "Timer recovery");
+        }
+        finally { _unfinishedTimerWindow = null; _showingUnfinishedTimer = false; }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -315,7 +379,7 @@ public partial class MainWindow : Window
         for (var element = source; element is not null && element != row;
              element = System.Windows.Media.VisualTreeHelper.GetParent(element))
         {
-            if (element is System.Windows.Controls.Primitives.ButtonBase) return;
+            if (element is System.Windows.Controls.Primitives.ButtonBase or System.Windows.Controls.TextBox) return;
         }
         e.Handled = true;
         ViewModel.EditEntryCommand.Execute(entry);
@@ -326,7 +390,7 @@ public partial class MainWindow : Window
         // Keep all metadata available, and give surplus width to the description.
         if (DescriptionColumn is not null)
         {
-            DescriptionColumn.Width = Math.Max(210, e.NewSize.Width - 685);
+            DescriptionColumn.Width = Math.Max(210, e.NewSize.Width - 925);
         }
     }
 
@@ -340,7 +404,7 @@ public partial class MainWindow : Window
 
     private void OnTimerDescriptionLostFocus(object sender, RoutedEventArgs e)
     {
-        Dispatcher.BeginInvoke(() => ViewModel.IsTimerSuggestionsOpen = false, System.Windows.Threading.DispatcherPriority.Background);
+        CloseSuggestionsAfterFocusLoss(sender);
     }
 
     private void OnTimerDescriptionTextChanged(object sender, TextChangedEventArgs e)
@@ -350,9 +414,9 @@ public partial class MainWindow : Window
 
     private void OnTimerSuggestionSelected(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (sender is System.Windows.Controls.ListBox { SelectedItem: string suggestion })
+        if (TryGetSuggestion(sender, e, out var suggestion))
         {
-            ViewModel.TimerDescription = suggestion;
+            ViewModel.SelectDescriptionSuggestion("Timer", suggestion);
             ViewModel.IsTimerSuggestionsOpen = false;
         }
     }
@@ -388,7 +452,7 @@ public partial class MainWindow : Window
 
     private void OnManualDescriptionLostFocus(object sender, RoutedEventArgs e)
     {
-        Dispatcher.BeginInvoke(() => ViewModel.IsManualSuggestionsOpen = false, System.Windows.Threading.DispatcherPriority.Background);
+        CloseSuggestionsAfterFocusLoss(sender);
     }
 
     private void OnManualDescriptionTextChanged(object sender, TextChangedEventArgs e)
@@ -398,25 +462,89 @@ public partial class MainWindow : Window
 
     private void OnRangeDescriptionLostFocus(object sender, RoutedEventArgs e)
     {
-        Dispatcher.BeginInvoke(() => ViewModel.IsRangeSuggestionsOpen = false, System.Windows.Threading.DispatcherPriority.Background);
+        CloseSuggestionsAfterFocusLoss(sender);
+    }
+
+    private void CloseSuggestionsAfterFocusLoss(object sender)
+    {
+        if (sender is not System.Windows.Controls.TextBox { Tag: string field } textBox) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!textBox.IsKeyboardFocusWithin) ViewModel.CloseDescriptionSuggestions(field);
+        }, DispatcherPriority.Background);
+    }
+
+    private System.Windows.Controls.ListBox SuggestionList(string field) => field switch
+    {
+        "Timer" => TimerSuggestionsListBox, "Manual" => ManualSuggestionsListBox, "Range" => RangeSuggestionsListBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(field))
+    };
+
+    private void OnDescriptionPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox { Tag: string field } textBox) return;
+        if (e.Key == Key.Escape && ViewModel.SuggestionsOpen(field))
+        {
+            ViewModel.CloseDescriptionSuggestions(field);
+            e.Handled = true;
+        }
+        else if (ViewModel.SuggestionsOpen(field) && e.Key is Key.Up or Key.Down)
+        {
+            ViewModel.MoveDescriptionSuggestion(field, e.Key == Key.Down ? 1 : -1);
+            ScrollSelectedSuggestion(field);
+            e.Handled = true;
+        }
+        else if (ViewModel.SuggestionsOpen(field) && e.Key == Key.Enter)
+        {
+            ViewModel.AcceptDescriptionSuggestion(field);
+            textBox.CaretIndex = textBox.Text.Length;
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down && string.IsNullOrWhiteSpace(textBox.Text)) e.Handled = true;
+    }
+
+    private async void OnDescriptionPreviewKeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox { Tag: string field } textBox ||
+            e.Key != Key.Down || !string.IsNullOrWhiteSpace(textBox.Text) || ViewModel.SuggestionsOpen(field)) return;
+        e.Handled = true;
+        await ViewModel.ShowRecentDescriptionSuggestionsAsync(field);
+        ScrollSelectedSuggestion(field);
+    }
+
+    private void ScrollSelectedSuggestion(string field)
+    {
+        var list = SuggestionList(field);
+        if (list.SelectedItem is not null) list.ScrollIntoView(list.SelectedItem);
     }
 
     private void OnRangeSuggestionSelected(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (sender is System.Windows.Controls.ListBox { SelectedItem: string suggestion })
+        if (TryGetSuggestion(sender, e, out var suggestion))
         {
-            ViewModel.RangeDescription = suggestion;
+            ViewModel.SelectDescriptionSuggestion("Range", suggestion);
             ViewModel.IsRangeSuggestionsOpen = false;
         }
     }
 
     private void OnManualSuggestionSelected(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (sender is System.Windows.Controls.ListBox { SelectedItem: string suggestion })
+        if (TryGetSuggestion(sender, e, out var suggestion))
         {
-            ViewModel.ManualDescription = suggestion;
+            ViewModel.SelectDescriptionSuggestion("Manual", suggestion);
             ViewModel.IsManualSuggestionsOpen = false;
         }
     }
+
+    private static bool TryGetSuggestion(object sender, MouseButtonEventArgs e, out string suggestion)
+    {
+        suggestion = string.Empty;
+        if (sender is not System.Windows.Controls.ListBox list || e.OriginalSource is not DependencyObject source ||
+            ItemsControl.ContainerFromElement(list, source) is not ListBoxItem { DataContext: string text }) return false;
+        suggestion = text;
+        e.Handled = true;
+        return true;
+    }
+
 }
 

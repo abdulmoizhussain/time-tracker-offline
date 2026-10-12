@@ -20,6 +20,9 @@ public interface ITimeEntryRepository
     Task<IReadOnlyList<TimeEntry>> GetWeekEntriesAsync(TimeEntryFilter filter, DateTime weekStartUtc, DateTime weekEndUtcExclusive,
         TimeEntrySort sort, bool descending, CancellationToken cancellationToken = default);
     Task<TimeEntry?> GetRunningEntryAsync(CancellationToken cancellationToken = default);
+    Task SaveTimerInterruptionAsync(TimerInterruption interruption, CancellationToken cancellationToken = default);
+    Task<TimerInterruption?> GetTimerInterruptionAsync(int entryId, CancellationToken cancellationToken = default);
+    Task ClearTimerInterruptionAsync(int entryId, DateTime? throughUtc = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<string>> SearchDescriptionsAsync(string search, int take, CancellationToken cancellationToken = default);
     Task<int> GetDatabaseVersionAsync(CancellationToken cancellationToken = default);
     Task ClearAllDataAsync(CancellationToken cancellationToken = default);

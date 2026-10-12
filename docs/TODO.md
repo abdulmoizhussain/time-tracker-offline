@@ -6,6 +6,23 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Explain every unfinished-task popup action beside its button, with matching tooltips/accessibility help and fallback/unavailable timestamp guidance (AR-023).
+
+- [x] Add unfinished-task recovery on unlock and app startup, with Continue / Stop at recorded time / Stop now, persistent interruption timestamps, and explicitly labeled activity fallback after abrupt exits (AR-022).
+- [x] Add optional Initial duration to Start Timer, preserving Created and ticking from the supplied duration (AR-022).
+- [x] Show last five entries on empty-description Down-arrow key-up, with Up/Down navigation, Enter selection, and Escape dismissal for all three description inputs (AR-022).
+- [ ] **Author review requested:** seeded timers may start on the previous day when their initial duration exceeds time since midnight; this is explicitly allowed temporarily by AR-022.
+- [ ] Verify actual Windows lock/unlock, sign-out/shutdown, hidden startup popup focus, and crash recovery in an interactive session (AR-022).
+
+
+- [x] Verify and regression-test that Created records the actual addition moment for duration entries, independently of selected dates and shifted Start/End (AR-021).
+
+- [x] Select/copy row descriptions, fix suggestion click/focus and stale-search races in all three description inputs, compact cards/date/header spacing, single-line timestamps, and remove the row's visible In progress label (AR-020).
+- [x] Place manual duration entries at the current clock time on the selected date, shift Start back to end at 23:59:59 on overflow, and guard the retained duration-edit path against crossing dates (AR-020).
+- [ ] Fix JSON imports discarding Start/End timestamps and assigning entries to the import date; preserve existing large-duration support while defining same-day import handling (AR-020 audit).
+- [ ] Define same-day handling for timers running across midnight (including restored timers and row/tray Stop); currently their full duration is assigned to the start date (AR-020 audit).
+- [ ] Review historical cross-day/undated entries and reporting/export attribution; do not migrate or modify historical records without an agreed policy (AR-020 audit).
+
 - [x] Add description-only Edit entry popup via double-click and row context menu for running/completed tasks; disable Save for blank drafts, preserve timing, refresh active queries and running displays (AR-019).
 - [ ] Extend the Edit entry popup to support duration/start date after the author specifies the workflow (AR-019).
 
@@ -88,7 +105,7 @@ Original author statements and requirement history are maintained separately in 
 
 9. [ ] Allow modifying the ongoing timer description from the tray icon mini window. Previous editor reverted; replacement design pending (AR-010).
 
-10. Add a right-click context menu to copy the description to the clipboard.
+10. [x] Add a right-click context menu to copy the description to the clipboard, plus selectable row text (AR-020).
 
 11. Add a multi-select remove option for entries.
 

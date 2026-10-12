@@ -123,12 +123,21 @@ The app follows a layered MVVM architecture:
 
 ## Features
 
+### Initial timer duration, unfinished-task recovery, and keyboard suggestions
+
+- Before starting a timer, optionally enter **Initial duration** beside its description. It accepts the manual duration formats, from zero to 23:59:59; blank starts from zero. Start is moved backward by that duration, and elapsed time continues from it. Created records the actual addition moment. The initial-duration draft clears after starting.
+- **Temporary policy pending author review:** an initial duration may place Start on the previous local day (for example, 2 hours at 01:00). Normal running timers can also cross midnight; reporting currently assigns their full duration to the Start date.
+- If a task was still running when you locked the PC, the app shows **Unfinished task** on unlock. A running task restored at app startup also shows the popup, including when launched from Windows startup into the tray. Actions are **Continue**, **Stop at recorded time**, and **Stop now**. Continue includes elapsed time during the interruption; stopping at its recorded time excludes the later gap. Each button has a visible explanation, tooltip, and accessibility help describing which time is counted; the recorded-time hint shows its exact timestamp or explains why it is unavailable. Escape/X acts as Continue. Closing the main window to the tray does not count as exiting the app.
+- Recovery timestamps are independent of optional lock/unlock history recording. Lock and full app exit are recorded; Windows shutdown/sign-out recording is best effort. While active, a checkpoint is saved about every 30 seconds. After a crash or power loss, the popup clearly labels that fallback as **last recorded activity**, not an exact shutdown time. Legacy running tasks without a recorded timestamp offer Continue/Stop now; stopping at a recorded time is disabled.
+- In any of the three description inputs, release **Down-arrow** while empty to show the **last five entries by Created**, newest first (repeated descriptions are retained). Typed searches retain their existing matching results. Keep focus in the input: **Up/Down** changes the highlighted result, **Enter** fills that description only, and **Escape** dismisses the popup. Enter does not add an entry or start a timer.
+
+
 ### Modern desktop UI
 - Input fields use compact vertical padding and shorter minimum heights across the app, with matching manual-entry/filter action buttons and unchanged readable font sizes.
 - A shared light theme uses indigo actions, white surfaces, readable Segoe UI text, consistent controls, and vector Play/Stop icons across the main window, tray popup, and dialogs.
 - The timer stays accessible above the scrollable manual-entry area. Both entry methods remain independent; compact or scaled windows allow scrolling instead of shrinking fields.
 - Description search and sorting stay visible. **Filters** expands date/status controls; its count shows applied conditions. **Changes pending** identifies edits awaiting **Apply**. Week navigation remains accessible outside the filter scroller.
-- The entry table uses compact two-line timestamps, right-aligned full durations, running status labels, and a description column that grows with the window. Metadata remains accessible through horizontal scrolling.
+- The entry table uses single-line timestamps, left-aligned full durations, running row highlights, and a description column that grows with the window. Metadata remains accessible through horizontal scrolling.
 - Expand **Stored locally · database details** to select/copy the full path. Remove/Clear confirmations share the theme and default to Cancel.
 - The design reference is [UI_PLAN.md](docs/UI_PLAN.md). `tools/UiPreview` renders actual WPF content with isolated sample data for layout review.
 
@@ -139,18 +148,18 @@ The app follows a layered MVVM architecture:
 ### Timer
 - Start/stop a running timer.
 - Live elapsed-time display in the main window title, status bar, taskbar progress, and tray popup.
-- Double-click an entry or choose **Edit entry** from its right-click menu to edit its description in a popup. Running timers keep running; Save updates the list, main timer, title, and tray popup. Blank/whitespace-only descriptions disable Save. Cancel/Escape/X discards the draft. Only Description and Modified change; dates/duration and Created are preserved.
+- Select description text and press Ctrl+C to copy it, or use right-click → **Copy description** for the entire description. Double-clicking description text selects a word; double-click elsewhere on an entry or choose **Edit entry** from its right-click menu to edit its description in a popup. Running timers keep running; Save updates the list, main timer, title, and tray popup. Blank/whitespace-only descriptions disable Save. Cancel/Escape/X discards the draft. Only Description and Modified change; dates/duration and Created are preserved.
 - Default timer description is configurable in-app (default: `Untitled task`).
 
 ### Manual Entries
-- Manual duration input is limited to **1 second–24 hours** for the selected date. Malformed, negative, overflowing, or out-of-range components are rejected with an inline message. Start Date is required; start/end times use 24-hour `H:mm` or `HH:mm:ss` with hours 0–23 and minutes/seconds 0–59. End must follow start on the same day; ambiguous/nonexistent clock-change times are rejected. Stop a running entry before changing its duration/date/times.
+- Manual duration input must fit within **00:00:00–23:59:59 on the selected date** (maximum duration 23:59:59). Malformed, negative, overflowing, or out-of-range components are rejected with an inline message. Start Date is required; start/end times use 24-hour `H:mm` or `HH:mm:ss` with hours 0–23 and minutes/seconds 0–59. End must follow start on the same day; ambiguous/nonexistent clock-change times are rejected. Stop a running entry before changing its duration/date/times.
 - This input limit does not change existing/imported large durations: list cells, elapsed timers, totals, and JSON exports show full hours without wrapping at 24. Import allows durations above 24 hours within the existing integer-seconds storage range and reports skipped invalid/unrepresentable entries.
 - Both rows place a compact Start Date field first, followed by a wider Description field, then duration or time inputs.
 - **Add by duration**: Description, Start Date, and Duration, with its own Add/Save button.
 - Duration examples, the input limit, and the clickable **Duration help** link appear in parentheses beside **By duration**, rather than on a separate line below the fields.
 - **Add by start and end time**: Description, Start Date, Start Time, and End Time, with its own + Add with Range/Save Range button. Both manual-entry action buttons align with their input fields and match their height.
-- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions. Single-click selects an entry; double-click opens the description editor without changing either manual-entry draft.
-- Duration entries are assigned to the selected local date (stored as midnight in `StartUtc`, with no end time); Created/Modified still reflect when the record was saved. The list groups entries by local date.
+- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions. Single-click selects an entry; double-click outside the description opens the description editor without changing either manual-entry draft.
+- Duration entries use the current local clock time on the selected date and store both Start and End in UTC. If that duration would extend past 23:59:59, Start shifts backward so End is 23:59:59. Created/Modified still reflect when the record was saved. The list groups entries by local date.
 - Duration box and start/end time boxes auto-sync on focus loss.
 
 ### Entry List
@@ -298,9 +307,11 @@ dotnet publish .\TimeTracker.App\TimeTracker.App.csproj -c Release -r win-x64 --
 
 ## Database Schema & Versioning
 
-The database uses `PRAGMA user_version` for migrations. Current version is **2**.
+The database uses `PRAGMA user_version` for migrations. Current version is **3**.
 
 ### Tables
+
+`TimerInterruptions` (schema v3) stores each running entry's latest recovery reason and UTC timestamp, with a cascading reference to `TimeEntries`. Saving a checkpoint does not change the entry's Created/Modified timestamps.
 
 #### `TimeEntries`
 | Column | Type | Notes |

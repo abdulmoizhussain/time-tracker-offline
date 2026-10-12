@@ -27,7 +27,103 @@ public sealed class TimeEntryRepositoryTests : IDisposable
     public async Task InitializeAsync_CreatesSchema()
     {
         var version = await _repository.GetDatabaseVersionAsync();
-        Assert.Equal(2, version);
+        Assert.Equal(3, version);
+    }
+
+    [Fact]
+    public async Task VersionTwoMigrationPreservesEntriesAndAddsRecoveryState()
+    {
+        var id = await _repository.StartTimerAsync("Existing timer", DateTime.UtcNow.AddHours(-1));
+        var before = (await _repository.GetRunningEntryAsync())!;
+        using (var connection = new SqliteConnectionFactory(_databasePath).CreateConnection())
+        {
+            await connection.OpenAsync();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DROP TABLE TimerInterruptions; PRAGMA user_version = 2;";
+            await command.ExecuteNonQueryAsync();
+        }
+        await _repository.InitializeAsync();
+        await _repository.InitializeAsync();
+        Assert.Equal(3, await _repository.GetDatabaseVersionAsync());
+        var after = (await _repository.GetRunningEntryAsync())!;
+        Assert.Equal(before.StartUtc, after.StartUtc);
+        Assert.Equal(before.CreatedUtc, after.CreatedUtc);
+        Assert.Equal(before.UpdatedUtc, after.UpdatedUtc);
+        var checkpoint = new TimerInterruption(id, TimerInterruptionReason.Exit, DateTime.UtcNow);
+        await _repository.SaveTimerInterruptionAsync(checkpoint);
+        Assert.Equal(checkpoint, await _repository.GetTimerInterruptionAsync(id));
+    }
+
+    [Theory]
+    [InlineData(TimerInterruptionReason.Lock)]
+    [InlineData(TimerInterruptionReason.Exit)]
+    [InlineData(TimerInterruptionReason.Shutdown)]
+    [InlineData(TimerInterruptionReason.LastSeen)]
+    public async Task InterruptionSurvivesRepositoryRecreationWithoutChangingEntry(TimerInterruptionReason reason)
+    {
+        var now = DateTime.UtcNow;
+        var id = await _repository.StartTimerAsync("Unfinished", now.AddHours(-2));
+        var before = Assert.Single(await _repository.GetRecentEntriesAsync(1));
+        var checkpoint = new TimerInterruption(id, reason, now);
+        await _repository.SaveTimerInterruptionAsync(checkpoint);
+        var restored = new TimeEntryRepository(new SqliteConnectionFactory(_databasePath));
+        Assert.Equal(checkpoint, await restored.GetTimerInterruptionAsync(id));
+        var after = await restored.GetRunningEntryAsync();
+        Assert.NotNull(after);
+        Assert.Equal(before.CreatedUtc, after.CreatedUtc);
+        Assert.Equal(before.UpdatedUtc, after.UpdatedUtc);
+        Assert.Equal(before.StartUtc, after.StartUtc);
+        await restored.ClearTimerInterruptionAsync(id);
+        Assert.Null(await restored.GetTimerInterruptionAsync(id));
+        Assert.NotNull(await restored.GetRunningEntryAsync());
+    }
+
+    [Fact]
+    public async Task ActivityCannotOverwriteLockAndOlderEventsCannotReplaceExit()
+    {
+        var now = DateTime.UtcNow;
+        var id = await _repository.StartTimerAsync("Task", now.AddMinutes(-10));
+        var locked = new TimerInterruption(id, TimerInterruptionReason.Lock, now);
+        await _repository.SaveTimerInterruptionAsync(locked);
+        await _repository.SaveTimerInterruptionAsync(new(id, TimerInterruptionReason.LastSeen, now.AddMinutes(1)));
+        Assert.Equal(locked, await _repository.GetTimerInterruptionAsync(id));
+        var exited = new TimerInterruption(id, TimerInterruptionReason.Exit, now.AddMinutes(2));
+        await _repository.SaveTimerInterruptionAsync(exited);
+        await _repository.SaveTimerInterruptionAsync(locked);
+        Assert.Equal(exited, await _repository.GetTimerInterruptionAsync(id));
+        await _repository.ClearTimerInterruptionAsync(id, locked.OccurredUtc);
+        Assert.Equal(exited, await _repository.GetTimerInterruptionAsync(id));
+    }
+
+    [Fact]
+    public async Task StoppingAtRecordedTimeIncludesInitialDurationAndPreservesCreated()
+    {
+        var now = DateTime.UtcNow;
+        var id = await _repository.StartTimerAsync("Seeded timer", now.AddHours(-2));
+        var created = (await _repository.GetRunningEntryAsync())!.CreatedUtc;
+        var lockedAt = now.AddMinutes(5);
+        await _repository.SaveTimerInterruptionAsync(new(id, TimerInterruptionReason.Lock, lockedAt));
+        await _repository.StopTimerAsync(id, lockedAt);
+        var stopped = Assert.Single(await _repository.GetRecentEntriesAsync(1));
+        Assert.Equal(7500, stopped.DurationSeconds);
+        Assert.Equal(lockedAt, stopped.EndUtc);
+        Assert.Equal(created, stopped.CreatedUtc);
+        Assert.Null(await _repository.GetTimerInterruptionAsync(id));
+        await _repository.SaveTimerInterruptionAsync(new(id, TimerInterruptionReason.LastSeen, DateTime.UtcNow));
+        Assert.Null(await _repository.GetTimerInterruptionAsync(id));
+    }
+
+    [Fact]
+    public async Task DeletingEntriesCascadesRecoveryStateAndRecentEntriesUseCreationOrder()
+    {
+        var id = await _repository.StartTimerAsync("Backdated Start", DateTime.UtcNow.AddDays(-1));
+        await _repository.SaveTimerInterruptionAsync(new(id, TimerInterruptionReason.Lock, DateTime.UtcNow));
+        await _repository.AddManualRangeEntryAsync("Newer addition", DateTime.Today.AddDays(-10), DateTime.Today.AddDays(-10).AddHours(1));
+        Assert.Equal("Newer addition", (await _repository.GetRecentEntriesAsync(5))[0].Description);
+        await _repository.DeleteEntryAsync(id);
+        await _repository.ClearAllDataAsync();
+        Assert.Null(await _repository.GetTimerInterruptionAsync(id));
+        Assert.Empty(await _repository.GetRecentEntriesAsync(5));
     }
 
     [Theory]
@@ -129,6 +225,29 @@ public sealed class TimeEntryRepositoryTests : IDisposable
         Assert.True(id > 0);
         var entries = await _repository.GetRecentEntriesAsync(10);
         var entry = Assert.Single(entries);
+        Assert.Equal(7200, entry.DurationSeconds);
+    }
+
+    [Theory]
+    [InlineData(-30)]
+    [InlineData(0)]
+    [InlineData(30)]
+    public async Task DurationPlacementKeepsCreatedAtActualAddTime(int selectedDayOffset)
+    {
+        var selectedDate = DateTime.Today.AddDays(selectedDayOffset);
+        Assert.True(TimeTracker.App.Helpers.ManualEntryValidation.TryDurationRange(
+            selectedDate, TimeSpan.FromHours(23), TimeSpan.FromHours(2), out var startLocal, out var endLocal));
+
+        var beforeAddUtc = DateTime.UtcNow;
+        await _repository.AddManualRangeEntryAsync("Late-day duration", startLocal, endLocal);
+        var afterAddUtc = DateTime.UtcNow;
+
+        var entry = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.InRange(entry.CreatedUtc, beforeAddUtc, afterAddUtc);
+        Assert.Equal(DateTimeKind.Utc, entry.CreatedUtc.Kind);
+        Assert.Equal(entry.CreatedUtc, entry.UpdatedUtc);
+        Assert.Equal(selectedDate.AddHours(21).AddMinutes(59).AddSeconds(59), entry.StartUtc!.Value.ToLocalTime());
+        Assert.Equal(selectedDate.AddHours(23).AddMinutes(59).AddSeconds(59), entry.EndUtc!.Value.ToLocalTime());
         Assert.Equal(7200, entry.DurationSeconds);
     }
 

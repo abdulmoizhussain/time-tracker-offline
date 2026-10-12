@@ -4,6 +4,21 @@ namespace TimeTracker.App.Helpers;
 
 public static class ManualEntryValidation
 {
+    public static bool TryDurationRange(DateTime date, TimeSpan preferredStartTime, TimeSpan duration,
+        out DateTime startLocal, out DateTime endLocal)
+    {
+        startLocal = endLocal = default;
+        var dayEnd = date.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+        if (duration < TimeSpan.FromSeconds(1) || duration > dayEnd - date.Date ||
+            preferredStartTime < TimeSpan.Zero || preferredStartTime >= TimeSpan.FromDays(1)) return false;
+        startLocal = date.Date + preferredStartTime;
+        if (duration > dayEnd - startLocal) startLocal = dayEnd - duration;
+        endLocal = startLocal + duration;
+        return !TimeZoneInfo.Local.IsInvalidTime(startLocal) && !TimeZoneInfo.Local.IsInvalidTime(endLocal) &&
+            !TimeZoneInfo.Local.IsAmbiguousTime(startLocal) && !TimeZoneInfo.Local.IsAmbiguousTime(endLocal) &&
+            endLocal.ToUniversalTime() - startLocal.ToUniversalTime() == duration;
+    }
+
     public static bool TryDuration(string? input, out TimeSpan duration)
         => DurationParser.TryParse(input, out duration) && duration >= TimeSpan.FromSeconds(1) && duration <= TimeSpan.FromHours(24);
 

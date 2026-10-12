@@ -28,6 +28,9 @@ The quotes record intent, not proof that a feature works. [README.md](../README.
 | [AR-012](#ar-012--implement-the-ui-plan) | Approval to implement the UI plan |
 | [AR-013](#ar-013--table-alignment-persistent-queries-export-range-and-startup-option) | Table alignment, persistent queries, export range, and startup-option explanation |
 | [AR-014](#ar-014--compact-input-fields) | Reduce input-field vertical padding |
+| [AR-020](#ar-020--selectable-descriptions-suggestions-compact-rows-and-same-day-duration-placement) | Selectable descriptions, suggestions, compact rows, same-day duration placement |
+| [AR-021](#ar-021--created-records-the-actual-addition-moment) | Created records the actual addition moment |
+| [AR-022](#ar-022--unfinished-task-popup-initial-timer-duration-and-keyboard-suggestions) | Unfinished tasks, initial duration, keyboard suggestions |
 
 ## AR-001 — Entry timestamps, tray popup, and running description
 
@@ -354,6 +357,94 @@ Relationship: replaces the deferred list/running-description interaction from AR
 
 Implementation notes (agent decisions): save only Description/UpdatedUtc by stable entry ID regardless of running state, trim outer whitespace, detect deleted entries, keep errors/drafts in the popup for retry, and disable dismissal while saving. Refresh the current query without clearing filters or manual drafts. A renamed row may no longer match its filter. Timer-control double-clicks, headers, and empty space do not open the popup.
 
+## AR-020 — Selectable descriptions, suggestions, compact rows, and same-day duration placement
+
+Recorded: 2026-10-12 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- every listview entry's description text should be selectable, for it to be copyable.
+- the type and search drop down is not working upon clikcing on the search result dropdown item. means when i click on the dropdown items it does not add it in the description box.
+- reduce vertical paddings/margins of these: "Start Date" input fields, "TimeTracker" card box specially "TimeTracker" top margin, "Manual entry" top margin, listview's header row's vertical padding, make the timestamps single line of the all the listview items (Start, End, Created, Modified)
+- no need to show `In progress` text in the listview for the ongoing task.
+- The `add by duration` entries are getting added by day start time. and not by current date time. An edge case might happen where if someone lets say gives a duration input to be 2 hours, but the current time is 23:00, in that case consider start time to be: {CurrentDate:23:59:59} - {InputDuration} i.e. StartTime = DayEndMoment - InputDurationTime.
+-- pls remember that we have check other areas as well for such kind of issues, because we our goal is to put each days task in their specific days. we are not considering the complications of logging the times of going between more than one days. hightlight to me such areas.
+```
+
+Relationship: refines AR-002/008/012/014; removes the visible running status chosen for AR-005 while retaining highlighting. Refines AR-019: double-click on description text selects a word; elsewhere on the row still opens Edit entry.
+
+Implementation notes (agent decisions): preserve the selected date, using the current local clock time on that date; save Start and End in UTC. Shift Start back when necessary to cap End at 23:59:59. Reject durations beyond 23:59:59 because they cannot fit with that exact boundary, and reject ambiguous/nonexistent clock-change times or UTC elapsed-time mismatches. Historical large durations remain unchanged. Description text supports selection/Ctrl+C and row context-menu copying.
+
+Audit findings (agent observations): import parses but discards supplied dates/times and saves undated entries, which are grouped by Created; live/restored timers can cross midnight and their entire completed duration is grouped under Start. Existing undated/cross-day records and query/export grouping also need a policy. No historical records or timer/import behavior are changed by this UI/manual-duration fix; follow-ups are recorded in TODO.
+
+## AR-021 — Created records the actual addition moment
+
+Recorded: 2026-10-12 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+`Duration entries now use the current clock time on the selected date. At 23:00, a 2-hour entry becomes 21:59:59–23:59:59. The maximum is now 23:59:59 to keep both timestamps on that day.` pls ensure that the Created date should be the exact moment the entry is being added at.
+```
+
+Relationship: clarifies AR-020. Calculating or shifting Start/End must not shift Created.
+
+Implementation notes (agent observations): the repository already stamps CreatedUtc with DateTime.UtcNow when adding the entry, independently of its selected date and Start/End. The UI converts it to local time. Regression coverage checks past, current, and future selected dates with shifted late-night ranges, asserting Created is between the actual before/after add moments and initial Modified equals Created.
+
+## AR-022 — Unfinished-task popup, initial timer duration, and keyboard suggestions
+
+Recorded: 2026-10-12 (Asia/Karachi). Source: author messages and question replies in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- we need to add a pop up msg for the user to let them know: You left this task open when you last locked your PC (turned off your PC or closed this TimeTracker App) at {this time} -- its a draft for an idea. rephrase the msg in better form.
+- start timer should also have an option to start a new entry with a defined duration, and the timer should continue from that duration. like for the Start Timer, beside the description box the duration box should be an input field where the user can enter duration just like the manual-entry-duration box, and then upon clikcing the Start timer button the time continue to tick from that duration.
+- when the description input box is empty - it should listen for the down-arrow-key key-up event, and give last 5 entries, just like the search results.
+- and then, the search results and the down arrow key event results should all be selectable by enter key. like from the up down arrow key i should be able to select the shown results and when i press the enter button the selected result should then be populated in the relevant description box/field.
+
+let me know if you have any confusion in these?
+```
+
+Author's answers (verbatim; questions summarized separately for context):
+
+Popup timing (context: unlock, startup, or both):
+
+```text
+On unlock and app startup
+```
+
+Popup actions:
+
+```text
+Continue, or stop at the recorded lock/exit time, or stop at the current time. all these 3.
+```
+
+Initial duration exceeding time since midnight (context: option 2 was allowing Start on the previous day):
+
+```text
+selecting number 2 for this for now, but flag this behaviour I will review this again later.
+```
+
+Relationship: AR-021's Created timestamp rule remains. The previous-day timer-start exception is explicitly temporary; AR-020's same-day manual-duration placement is unchanged.
+
+Implementation notes (agent decisions): optional initial duration accepts zero/blank and manual formats up to 23:59:59, backdates Start in UTC, clears after start, and does not backdate Created. Three description inputs show the newest five records by Created, retaining duplicate descriptions, on empty-field Down-arrow key-up; searches and recents share Up/Down, Enter, Escape, click selection, and stale-query protection. Enter fills only the field.
+
+Recovery uses per-entry SQLite checkpoints (schema v3), independent of optional session-history recording. Exact recorded lock/exit times are distinguished from best-effort Windows shutdown/sign-out notifications and periodic last-activity fallback. Unknown timestamps on legacy running tasks disable the recorded-time action. Continue preserves the original Start (including elapsed interruption time); Escape/X also means Continue. Full Exit is recorded; hiding the main window to the tray is not an exit. Normal startup and hidden Windows startup both show recovery. Checkpoints do not change entry Created/Modified and are removed on Stop or entry deletion. Native OS-event delivery/focus behavior remains an interactive verification item.
+
+## AR-023 — Explain every unfinished-task popup action
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> on the unlock screen popup message, also add hint-detail-explanation for every button.
+
+Relationship: refines AR-022's unfinished-task popup.
+
+Implementation notes (agent decisions): show an explanation beside each action, also exposed as its tooltip and accessibility help. Continue keeps counting time while away; Stop at recorded time excludes time after the displayed timestamp; Stop now includes time while away and ends at the current moment. Explain the last-activity fallback and why the recorded-time action is disabled when no timestamp exists. Continue's hint also explains Enter/Escape/X behavior. Applies to the shared unlock/startup popup.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -367,7 +458,7 @@ Implementation notes (agent decisions): save only Description/UpdatedUtc by stab
 ### Entry template
 
 ```markdown
-## AR-020 — Short subject
+## AR-024 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 

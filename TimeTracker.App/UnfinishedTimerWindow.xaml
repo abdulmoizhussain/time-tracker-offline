@@ -1,0 +1,23 @@
+<Window x:Class="TimeTracker.App.UnfinishedTimerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Unfinished task" Width="580" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" Style="{StaticResource ScaledWindowStyle}">
+    <Border Style="{StaticResource SurfaceStyle}" Margin="16">
+        <StackPanel>
+            <TextBlock Text="You have an unfinished task" Style="{StaticResource SectionTitleStyle}" />
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,12,0,8" AutomationProperties.AutomationId="UnfinishedTaskMessage" />
+            <TextBlock Text="Continue tracking, or choose when this task should end." TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,16" />
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Button Content="Continue" IsDefault="True" IsCancel="True" MinWidth="170" VerticalAlignment="Top" Margin="0,0,0,14" Click="OnContinue" ToolTip="{Binding ContinueHint}" AutomationProperties.HelpText="{Binding ContinueHint}" AutomationProperties.AutomationId="ContinueUnfinishedTask" />
+                <TextBlock Grid.Column="1" Text="{Binding ContinueHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="12,0,0,14" />
+                <Button Grid.Row="1" Content="{Binding RecordedStopLabel}" IsEnabled="{Binding CanStopAtRecordedTime}" MinWidth="170" VerticalAlignment="Top" Margin="0,0,0,14" Click="OnRecordedStop" ToolTip="{Binding RecordedStopHint}" ToolTipService.ShowOnDisabled="True" AutomationProperties.HelpText="{Binding RecordedStopHint}" AutomationProperties.AutomationId="StopAtInterruption" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RecordedStopHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="12,0,0,14" />
+                <Button Grid.Row="2" Content="Stop now" Style="{StaticResource StopButtonStyle}" MinWidth="170" VerticalAlignment="Top" Click="OnStopNow" ToolTip="{Binding StopNowHint}" AutomationProperties.HelpText="{Binding StopNowHint}" AutomationProperties.AutomationId="StopUnfinishedTaskNow" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding StopNowHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="12,0,0,0" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

@@ -18,6 +18,7 @@ public sealed partial class TimeEntryViewModel : ObservableObject
     private DateTime? _endUtc;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DurationText))]
     private int _durationSeconds;
 
     [ObservableProperty]
@@ -31,10 +32,10 @@ public sealed partial class TimeEntryViewModel : ObservableObject
 
     public string ModifiedLocalText => UpdatedUtc.ToLocalTime().ToString("g");
 
-    public string CreatedLocalCompactText => CreatedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss");
-    public string ModifiedLocalCompactText => UpdatedUtc.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss");
-    public string StartLocalCompactText => StartUtc?.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss") ?? "—";
-    public string EndLocalCompactText => EndUtc?.ToLocalTime().ToString("d MMM yyyy\nHH:mm:ss") ?? "—";
+    public string CreatedLocalCompactText => CreatedUtc.ToLocalTime().ToString("d MMM yyyy HH:mm:ss");
+    public string ModifiedLocalCompactText => UpdatedUtc.ToLocalTime().ToString("d MMM yyyy HH:mm:ss");
+    public string StartLocalCompactText => StartUtc?.ToLocalTime().ToString("d MMM yyyy HH:mm:ss") ?? "—";
+    public string EndLocalCompactText => EndUtc?.ToLocalTime().ToString("d MMM yyyy HH:mm:ss") ?? "—";
 
     public DateTime GroupDate => (StartUtc ?? EndUtc ?? CreatedUtc).ToLocalTime().Date;
 

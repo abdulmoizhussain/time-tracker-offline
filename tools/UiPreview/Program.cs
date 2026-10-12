@@ -51,6 +51,7 @@ internal static class Program
         var vm = new MainViewModel(repository, repository, Options.Create(new AppRuntimeOptions()));
         Wait(vm.InitializeAsync(database));
         var main = new MainWindow(new ScreenEventsWindow(), new ImportExportHistoryWindow()) { DataContext = vm };
+        vm.TimerInitialDuration = "1.5";
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
         vm.TimerDescription = "Building a more comfortable TimeTracker interface";
         Wait(vm.StartTimerCommand.ExecuteAsync(null));
@@ -67,6 +68,9 @@ internal static class Program
         Render(new EditEntryWindow(new EditEntryViewModel("Review the weekly plan", false, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-entry.png"));
         Render(new EditEntryWindow(new EditEntryViewModel("Running task", true, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-running-entry.png"));
         Render(new EditEntryWindow(new EditEntryViewModel("   ", false, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-entry-blank.png"));
+        Render(new UnfinishedTimerWindow("Review the weekly plan", new(1, TimeTracker.Core.Models.TimerInterruptionReason.Lock, DateTime.UtcNow)), 580, 400, Path.Combine(output, "unfinished-lock.png"));
+        Render(new UnfinishedTimerWindow("After an abrupt shutdown", new(1, TimeTracker.Core.Models.TimerInterruptionReason.LastSeen, DateTime.UtcNow)), 580, 400, Path.Combine(output, "unfinished-activity.png"));
+        Render(new UnfinishedTimerWindow("Legacy running entry", new(1, TimeTracker.Core.Models.TimerInterruptionReason.Unknown, null)), 580, 400, Path.Combine(output, "unfinished-unknown.png"));
         var exportOptions = new ExportOptionsWindow();
         var exportVm = (ExportOptionsViewModel)exportOptions.DataContext;
         exportVm.UseDateRange = true;
@@ -83,7 +87,7 @@ internal static class Program
             foreach (var error in diagnostics.Errors.Distinct()) Console.Error.WriteLine(error);
             throw new InvalidOperationException("WPF binding errors detected during preview.");
         }
-        Console.WriteLine($"Rendered twelve previews to {output}; no WPF binding errors.");
+        Console.WriteLine($"Rendered fifteen previews to {output}; no WPF binding errors.");
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(database);
         File.Delete(database + "-wal");

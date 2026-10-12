@@ -4,6 +4,7 @@
              xmlns:conv="clr-namespace:TimeTracker.App.Converters"
              Startup="OnApplicationStartup"
              Exit="OnExit"
+             SessionEnding="OnSessionEnding"
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <ResourceDictionary>
