@@ -1,5 +1,7 @@
 # UI Automation IDs
 
+The row context menu exposes `EditEntryMenuItem` for both running and completed entries. The Edit entry popup exposes `EditEntryDescriptionTextBox`, `EditEntrySaveButton`, `EditEntryCancelButton`, and `EditEntryError`. Save is disabled for empty/whitespace drafts. Double-clicking a row opens the popup; timer buttons, headers, and empty list space do not.
+
 This document lists the `AutomationProperties.AutomationId` values exposed by TimeTracker controls. These IDs are used by `TimeTracker.UITests` and can also be used by accessibility tools or third-party automation frameworks.
 
 ---

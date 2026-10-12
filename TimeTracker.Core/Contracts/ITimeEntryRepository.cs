@@ -11,6 +11,7 @@ public interface ITimeEntryRepository
     Task<int> AddDurationEntryAsync(string description, TimeSpan duration, DateTime startDateLocal, CancellationToken cancellationToken = default);
     Task<int> AddManualRangeEntryAsync(string description, DateTime startLocal, DateTime endLocal, CancellationToken cancellationToken = default);
     Task UpdateEntryAsync(TimeEntry entry, CancellationToken cancellationToken = default);
+    Task<bool> UpdateEntryDescriptionAsync(int id, string description, CancellationToken cancellationToken = default);
     Task UpdateRunningDescriptionAsync(int id, string description, CancellationToken cancellationToken = default);
     Task DeleteEntryAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TimeEntry>> GetRecentEntriesAsync(int take, CancellationToken cancellationToken = default);

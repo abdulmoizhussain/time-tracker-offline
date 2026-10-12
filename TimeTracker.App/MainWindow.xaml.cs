@@ -303,6 +303,24 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnEntryDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || sender is not System.Windows.Controls.ListView list ||
+            e.OriginalSource is not DependencyObject source ||
+            ItemsControl.ContainerFromElement(list, source) is not System.Windows.Controls.ListViewItem { DataContext: TimeEntryViewModel entry } row)
+        {
+            return;
+        }
+        // Double-clicking a row's timer control must not also open the editor.
+        for (var element = source; element is not null && element != row;
+             element = System.Windows.Media.VisualTreeHelper.GetParent(element))
+        {
+            if (element is System.Windows.Controls.Primitives.ButtonBase) return;
+        }
+        e.Handled = true;
+        ViewModel.EditEntryCommand.Execute(entry);
+    }
+
     private void OnEntriesSizeChanged(object sender, SizeChangedEventArgs e)
     {
         // Keep all metadata available, and give surplus width to the description.

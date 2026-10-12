@@ -30,6 +30,41 @@ public sealed class TimeEntryRepositoryTests : IDisposable
         Assert.Equal(2, version);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DescriptionEditPreservesTimingAndRunningState(bool running)
+    {
+        var id = await _repository.StartTimerAsync("Original", DateTime.UtcNow.AddHours(-2));
+        if (!running) await _repository.StopTimerAsync(id, DateTime.UtcNow.AddHours(-1));
+        var before = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.True(await _repository.UpdateEntryDescriptionAsync(id, "  Renamed  "));
+        var after = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.Equal("Renamed", after.Description);
+        Assert.Equal(before.StartUtc, after.StartUtc);
+        Assert.Equal(before.EndUtc, after.EndUtc);
+        Assert.Equal(before.DurationSeconds, after.DurationSeconds);
+        Assert.Equal(before.CreatedUtc, after.CreatedUtc);
+        Assert.Equal(before.IsRunning, after.IsRunning);
+        Assert.True(after.UpdatedUtc >= before.UpdatedUtc);
+    }
+
+    [Fact]
+    public async Task DescriptionEditAfterStopDoesNotRestartTaskAndMissingEntryIsReported()
+    {
+        var id = await _repository.StartTimerAsync("Original", DateTime.UtcNow.AddMinutes(-5));
+        await _repository.StopTimerAsync(id, DateTime.UtcNow);
+        var stopped = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.True(await _repository.UpdateEntryDescriptionAsync(id, "Renamed after stop"));
+        var after = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.False(after.IsRunning);
+        Assert.Equal(stopped.EndUtc, after.EndUtc);
+        Assert.Equal(stopped.DurationSeconds, after.DurationSeconds);
+        await _repository.DeleteEntryAsync(id);
+        Assert.False(await _repository.UpdateEntryDescriptionAsync(id, "Deleted"));
+        await Assert.ThrowsAsync<ArgumentException>(() => _repository.UpdateEntryDescriptionAsync(id, "   "));
+    }
+
     [Fact]
     public async Task StartTimerAsync_CreatesRunningEntry()
     {

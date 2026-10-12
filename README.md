@@ -139,7 +139,7 @@ The app follows a layered MVVM architecture:
 ### Timer
 - Start/stop a running timer.
 - Live elapsed-time display in the main window title, status bar, taskbar progress, and tray popup.
-- The running-description editors have been removed pending the author's replacement interaction design (AR-010).
+- Double-click an entry or choose **Edit entry** from its right-click menu to edit its description in a popup. Running timers keep running; Save updates the list, main timer, title, and tray popup. Blank/whitespace-only descriptions disable Save. Cancel/Escape/X discards the draft. Only Description and Modified change; dates/duration and Created are preserved.
 - Default timer description is configurable in-app (default: `Untitled task`).
 
 ### Manual Entries
@@ -149,7 +149,7 @@ The app follows a layered MVVM architecture:
 - **Add by duration**: Description, Start Date, and Duration, with its own Add/Save button.
 - Duration examples, the input limit, and the clickable **Duration help** link appear in parentheses beside **By duration**, rather than on a separate line below the fields.
 - **Add by start and end time**: Description, Start Date, Start Time, and End Time, with its own + Add with Range/Save Range button. Both manual-entry action buttons align with their input fields and match their height.
-- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions. Clicking a list entry selects it without changing either draft; single/double-click entry-edit behavior is deferred pending the author's design.
+- Each row keeps an independent draft. Adding an entry clears only that row. Both rows support description suggestions. Single-click selects an entry; double-click opens the description editor without changing either manual-entry draft.
 - Duration entries are assigned to the selected local date (stored as midnight in `StartUtc`, with no end time); Created/Modified still reflect when the record was saved. The list groups entries by local date.
 - Duration box and start/end time boxes auto-sync on focus loss.
 
@@ -162,7 +162,7 @@ The app follows a layered MVVM architecture:
 - Sorted newest-first.
 - **Created** and **Modified** columns show each entry's timestamps in local time (scroll horizontally to see all columns).
 - Start a new timer pre-filled with an existing description.
-- Right-click an entry for **Remove entry** (with confirmation) and, if running, **Stop running entry**. Actions target the clicked row, even if another row is selected.
+- Right-click an entry for **Edit entry**, **Remove entry** (with confirmation) and, if running, **Stop running entry**. Actions target the clicked row, even if another row is selected. Saving re-applies the current list filters/sort/week; an edited entry can disappear if its new description no longer matches. Duration/start-date editing in the popup is deferred.
 - The row's timer button shows **▶** for completed entries and **■** for running entries. Clicking **■** stops that entry and refreshes timer indicators and the current filtered week.
 - **Older week / Newer week** navigation includes a week date range and page count. The default first page is the current week (or the latest week if future-dated entries exist); empty intervening weeks remain navigable.
 - Filter by description text, inclusive local From/To dates, and All/Running/Completed status. Click **Apply** to reload the newest matching week; **Reset** clears filters and restores default sorting. Blank dates impose no date limit. Description searches treat `%` and `_` literally.

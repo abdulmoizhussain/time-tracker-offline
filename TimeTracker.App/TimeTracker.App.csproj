@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<Version>2.0.0</Version>
+		<Version>2.1.0</Version>
 		<TargetFramework>net8.0-windows</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -10,6 +10,7 @@
 		<UseWindowsForms>true</UseWindowsForms>
 		<AssemblyName>TimeTracker</AssemblyName>
 		<ApplicationIcon>Assets\TimeTracker.ico</ApplicationIcon>
+		<InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.Extensions.Configuration.Binder.SourceGeneration</InterceptorsNamespaces>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>

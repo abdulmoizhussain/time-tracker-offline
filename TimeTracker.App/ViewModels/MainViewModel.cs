@@ -647,8 +647,29 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        SelectedEntry = entry;
-        LoadEntryForEditing(entry);
+        var dialog = new EditEntryWindow(new EditEntryViewModel(entry.Description, entry.IsRunning,
+            description => SaveEntryDescriptionAsync(entry.Id, description)));
+        if (System.Windows.Application.Current.MainWindow is { IsVisible: true } owner)
+        {
+            dialog.Owner = owner;
+        }
+        dialog.ShowDialog();
+    }
+
+    public async Task SaveEntryDescriptionAsync(int id, string description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        description = description.Trim();
+        if (!await _repository.UpdateEntryDescriptionAsync(id, description))
+        {
+            throw new InvalidOperationException("This entry no longer exists. Close this window and refresh the list.");
+        }
+        if (_runningEntryId == id)
+        {
+            RunningStatusText = $"Running: {description}";
+            UpdateRunningDisplay();
+        }
+        await LoadEntriesAsync();
     }
 
     [RelayCommand(CanExecute = nameof(CanStopEntry))]

@@ -289,6 +289,23 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             .ConfigureAwait(false);
     }
 
+    public async Task<bool> UpdateEntryDescriptionAsync(int id, string description, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        const string sql = """
+            UPDATE TimeEntries
+            SET Description = @Description, UpdatedUtc = @UpdatedUtc
+            WHERE Id = @Id;
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            Id = id, Description = description.Trim(), UpdatedUtc = ToUtcString(DateTime.UtcNow)
+        }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return affected != 0;
+    }
+
     public async Task UpdateRunningDescriptionAsync(int id, string description, CancellationToken cancellationToken = default)
     {
         const string sql = """

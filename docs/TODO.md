@@ -6,6 +6,9 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Add description-only Edit entry popup via double-click and row context menu for running/completed tasks; disable Save for blank drafts, preserve timing, refresh active queries and running displays (AR-019).
+- [ ] Extend the Edit entry popup to support duration/start date after the author specifies the workflow (AR-019).
+
 - [x] Move duration hints and the help link into parentheses beside the By duration heading, removing the standalone hint line (AR-018).
 
 - [x] Make File Exit explicitly say it closes the entire app, including the tray, with explanatory tooltip/accessibility text (AR-017).
@@ -81,7 +84,7 @@ Original author statements and requirement history are maintained separately in 
 
 7. Add a periodic pop-up reminder to stop the timer if it has been running for a long time, e.g. every 15 minutes. This helps avoid forgotten timers and keeps time-tracking data accurate.
 
-8. [ ] Allow modifying the description after starting the timer. Previous Save/Enter editors reverted at the author's request; replacement design pending (AR-010).
+8. [x] Allow modifying the description after starting the timer through the list's Edit entry popup (AR-019), replacing the reverted editors (AR-010).
 
 9. [ ] Allow modifying the ongoing timer description from the tray icon mini window. Previous editor reverted; replacement design pending (AR-010).
 

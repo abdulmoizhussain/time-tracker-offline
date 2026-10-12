@@ -64,6 +64,9 @@ internal static class Program
         vm.IsFiltersExpanded = false;
         Render(new TrayPopupWindow(main), 340, 240, Path.Combine(output, "tray-running.png"));
         Render(new UsageWindow(), 660, 610, Path.Combine(output, "usage.png"));
+        Render(new EditEntryWindow(new EditEntryViewModel("Review the weekly plan", false, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-entry.png"));
+        Render(new EditEntryWindow(new EditEntryViewModel("Running task", true, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-running-entry.png"));
+        Render(new EditEntryWindow(new EditEntryViewModel("   ", false, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-entry-blank.png"));
         var exportOptions = new ExportOptionsWindow();
         var exportVm = (ExportOptionsViewModel)exportOptions.DataContext;
         exportVm.UseDateRange = true;
@@ -80,7 +83,7 @@ internal static class Program
             foreach (var error in diagnostics.Errors.Distinct()) Console.Error.WriteLine(error);
             throw new InvalidOperationException("WPF binding errors detected during preview.");
         }
-        Console.WriteLine($"Rendered nine previews to {output}; no WPF binding errors.");
+        Console.WriteLine($"Rendered twelve previews to {output}; no WPF binding errors.");
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(database);
         File.Delete(database + "-wal");

@@ -277,9 +277,9 @@ public sealed class EntryPaginationTests : IDisposable
                     await vm.ApplyEntryFiltersCommand.ExecuteAsync(null);
                     Assert.Equal("333333:00:00", Assert.Single(vm.Entries).DurationText);
                     Assert.Contains("333333 h 0 min", vm.EntryPageSummary);
-                    vm.EditEntryCommand.Execute(vm.Entries[0]);
-                    await vm.AddDurationEntryCommand.ExecuteAsync(null);
-                    Assert.NotEmpty(vm.ManualDurationError);
+                    await vm.SaveEntryDescriptionAsync(vm.Entries[0].Id, "Large legacy renamed");
+                    Assert.Equal("Large legacy renamed", Assert.Single(vm.Entries).Description);
+                    Assert.False(vm.IsEditMode);
                     Assert.Equal(1199998800, Assert.Single(await _repository.GetWeekEntriesAsync(
                         new TimeEntryFilter { Description = "Large legacy" }, currentMonday.ToUniversalTime(), currentMonday.AddDays(7).ToUniversalTime(), TimeEntrySort.Start, true)).DurationSeconds);
                     vm.CancelEditCommand.Execute(null);
@@ -292,6 +292,14 @@ public sealed class EntryPaginationTests : IDisposable
                     vm.SelectedEntry = completedRow;
                     Assert.True(vm.StopEntryCommand.CanExecute(runningRow));
                     Assert.False(vm.StopEntryCommand.CanExecute(completedRow));
+                    await vm.SaveEntryDescriptionAsync(runningRow.Id, "Renamed running timer");
+                    Assert.True(vm.IsTimerRunning);
+                    Assert.Equal("Running: Renamed running timer", vm.RunningStatusText);
+                    Assert.Contains("Renamed running timer", vm.WindowTitle);
+                    Assert.Equal("Renamed running timer", (await _repository.GetRunningEntryAsync())!.Description);
+                    Assert.Equal("Keep this draft", vm.ManualDescription);
+                    await vm.SaveEntryDescriptionAsync(completedRow.Id, "Renamed completed task");
+                    Assert.Equal("Running: Renamed running timer", vm.RunningStatusText);
                     await vm.StopEntryCommand.ExecuteAsync(runningRow);
                     Assert.False(vm.IsTimerRunning);
                     Assert.Equal("Time Tracker", vm.WindowTitle);

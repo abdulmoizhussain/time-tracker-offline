@@ -316,6 +316,44 @@ move the line `34 = minutes . 1.5 = hours . 1 second-24 hours. duration help` in
 
 Implementation notes (agent decisions): place the existing hints and clickable Duration help link in parentheses immediately after By duration. Remove the separate hint line, retain muted styling for the hints, and allow the heading to wrap when space is limited.
 
+## AR-019 — Edit entry description popup
+
+Recorded: 2026-10-12 (Asia/Karachi). Source: author messages in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+hey, we need to provide option to modify a task's description.
+
+we need to do this via a popup window.
+
+the popup window should open upon,
+
+- by double clicking on a task in the listview.
+- also in the right click menu of a task in the listview
+
+
+
+pls tackle the cases for ongoing tasks and completed tasks.
+
+if you have any assumptions, ask them first.
+```
+
+Author's clarification (verbatim):
+
+```text
+- Empty or whitespace-only descriptions are rejected. -- it will disable the Save button.
+- the right-click option will say "Edit entry" for both type of entries -- we will later add capability to modify duration or start date.
+
+correct for all the others.
+```
+
+Confirmed scope (summary, not an author quote): prefilled description-only popup with Save/Cancel; ongoing timers continue and display the saved description everywhere including the tray; completed timing/Created remain unchanged while Modified updates. Blank drafts disable Save. Duration/start-date editing is deferred.
+
+Relationship: replaces the deferred list/running-description interaction from AR-010 without restoring the removed inline editors or manual-form population.
+
+Implementation notes (agent decisions): save only Description/UpdatedUtc by stable entry ID regardless of running state, trim outer whitespace, detect deleted entries, keep errors/drafts in the popup for retry, and disable dismissal while saving. Refresh the current query without clearing filters or manual drafts. A renamed row may no longer match its filter. Timer-control double-clicks, headers, and empty space do not open the popup.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -329,7 +367,7 @@ Implementation notes (agent decisions): place the existing hints and clickable D
 ### Entry template
 
 ```markdown
-## AR-019 — Short subject
+## AR-020 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 
