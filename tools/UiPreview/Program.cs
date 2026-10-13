@@ -51,11 +51,26 @@ internal static class Program
         var vm = new MainViewModel(repository, repository, Options.Create(new AppRuntimeOptions()));
         Wait(vm.InitializeAsync(database));
         var main = new MainWindow(new ScreenEventsWindow(), new ImportExportHistoryWindow()) { DataContext = vm };
-        vm.TimerInitialDuration = "1.5";
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
+        AssertTimerButtonAlignment(main, "StartTimerButton", "TimerDescriptionTextBox");
+        vm.TimerInitialDuration = "1.5";
+        var expandedListHeight = ((ListView)main.FindName("EntriesListView")).ActualHeight;
+        var manualExpander = (Expander)main.FindName("ManualEntryExpander");
+        vm.ManualDescription = "Draft to preserve";
+        vm.RangeDescription = "Independent range draft";
+        manualExpander.IsExpanded = false;
+        Render(main, 1100, 760, Path.Combine(output, "main-manual-collapsed.png"));
+        if (((ListView)main.FindName("EntriesListView")).ActualHeight <= expandedListHeight)
+            throw new InvalidOperationException("Collapsing manual entry did not increase list height.");
+        manualExpander.IsExpanded = true;
+        if (vm.ManualDescription != "Draft to preserve" || vm.RangeDescription != "Independent range draft")
+            throw new InvalidOperationException("Collapsing manual entry lost drafts.");
+        vm.ManualDescription = vm.RangeDescription = string.Empty;
         vm.TimerDescription = "Building a more comfortable TimeTracker interface";
         Wait(vm.StartTimerCommand.ExecuteAsync(null));
-        Render(CreateMain(vm), 1100, 760, Path.Combine(output, "main-running.png"));
+        var runningWindow = CreateMain(vm);
+        Render(runningWindow, 1100, 760, Path.Combine(output, "main-running.png"));
+        AssertTimerButtonAlignment(runningWindow, "StopTimerButton", "TimerDescriptionTextBox");
         vm.IsFiltersExpanded = true;
         vm.FilterDescription = "work";
         Render(CreateMain(vm), 960, 510, Path.Combine(output, "main-small-filters.png"));
@@ -82,12 +97,24 @@ internal static class Program
         Wait(vm.ApplyEntryFiltersCommand.ExecuteAsync(null));
         Render(CreateMain(vm), 1100, 760, Path.Combine(output, "main-empty.png"));
         Wait(vm.StopTimerCommand.ExecuteAsync(null));
+        if (vm.TimerDescription != string.Empty) throw new InvalidOperationException("Stopping did not clear the timer description.");
+        vm.FilterDescription = string.Empty;
+        Wait(vm.ApplyEntryFiltersCommand.ExecuteAsync(null));
+        vm.TimerDescription = "Stop from entry list";
+        Wait(vm.StartTimerCommand.ExecuteAsync(null));
+        Wait(vm.StopEntryCommand.ExecuteAsync(vm.Entries.Single(entry => entry.IsRunning)));
+        if (vm.TimerDescription != string.Empty) throw new InvalidOperationException("List stop did not clear the timer description.");
+        vm.TimerDescription = "Stop from recovery popup";
+        Wait(vm.StartTimerCommand.ExecuteAsync(null));
+        var runningEntry = vm.Entries.Single(entry => entry.IsRunning);
+        Wait(vm.ResolveUnfinishedTimerAsync(new(runningEntry.Id, TimeTracker.Core.Models.TimerInterruptionReason.Lock, DateTime.UtcNow), true, true));
+        if (vm.TimerDescription != string.Empty) throw new InvalidOperationException("Recovery stop did not clear the timer description.");
         if (diagnostics.Errors.Count != 0)
         {
             foreach (var error in diagnostics.Errors.Distinct()) Console.Error.WriteLine(error);
             throw new InvalidOperationException("WPF binding errors detected during preview.");
         }
-        Console.WriteLine($"Rendered fifteen previews to {output}; no WPF binding errors.");
+        Console.WriteLine($"Rendered sixteen previews to {output}; no WPF binding errors.");
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(database);
         File.Delete(database + "-wal");
@@ -103,6 +130,16 @@ internal static class Program
         _ = task.ContinueWith(_ => dispatcher.BeginInvoke(() => frame.Continue = false));
         Dispatcher.PushFrame(frame);
         task.GetAwaiter().GetResult();
+    }
+
+    private static void AssertTimerButtonAlignment(MainWindow window, string buttonName, string inputName)
+    {
+        var button = (FrameworkElement)window.FindName(buttonName);
+        var input = (FrameworkElement)((FrameworkElement)window.FindName(inputName)).Parent;
+        var buttonCenter = button.TranslatePoint(new Point(0, button.ActualHeight / 2), window).Y;
+        var inputCenter = input.TranslatePoint(new Point(0, input.ActualHeight / 2), window).Y;
+        if (Math.Abs(buttonCenter - inputCenter) > 1)
+            throw new InvalidOperationException($"{buttonName} is not centered on the timer input row.");
     }
 
     private static MainWindow CreateMain(MainViewModel vm)

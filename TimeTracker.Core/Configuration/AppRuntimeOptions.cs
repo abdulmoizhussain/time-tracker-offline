@@ -2,6 +2,7 @@ namespace TimeTracker.Core.Configuration;
 
 public sealed class AppRuntimeOptions
 {
+    public bool AllowMultipleInstances { get; set; }
     public StorageOptions Storage { get; set; } = new();
     public HotkeyOptions Hotkeys { get; set; } = new();
     public SessionEventTrackingOptions SessionEvents { get; set; } = new();

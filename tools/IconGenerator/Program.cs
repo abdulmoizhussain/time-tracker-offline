@@ -33,29 +33,34 @@ static Bitmap DrawStopwatch(int size)
     graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
     graphics.Clear(Color.Transparent);
 
-    var centerX = size / 2f;
-    var centerY = size / 2f;
-    var radius = size * 0.35f;
-    var thickness = Math.Max(2f, size / 12f);
+    // A fixed badge keeps the stopwatch readable on light and dark Windows surfaces.
+    var inset = 0f; // Fill the entire taskbar icon canvas.
+    var corner = size * 0.18f;
+    var edge = size - inset;
+    using var badge = new System.Drawing.Drawing2D.GraphicsPath();
+    badge.AddArc(inset, inset, corner, corner, 180, 90);
+    badge.AddArc(edge - corner, inset, corner, corner, 270, 90);
+    badge.AddArc(edge - corner, edge - corner, corner, corner, 0, 90);
+    badge.AddArc(inset, edge - corner, corner, corner, 90, 90);
+    badge.CloseFigure();
+    using var background = new SolidBrush(Color.FromArgb(79, 70, 229)); // App's indigo accent.
+    graphics.FillPath(background, badge);
 
-    using var darkBrush = new SolidBrush(Color.FromArgb(33, 33, 33));
-    using var accentBrush = new SolidBrush(Color.FromArgb(0, 150, 200));
-    using var pen = new Pen(darkBrush, thickness);
-    using var accentPen = new Pen(accentBrush, thickness);
-
+    var centerX = size * 0.50f;
+    var centerY = size * 0.55f;
+    var radius = size * 0.36f;
+    var thickness = Math.Max(1.25f, size * 0.07f);
+    using var faceBrush = new SolidBrush(Color.White);
+    using var pen = new Pen(Color.White, thickness)
+    {
+        StartCap = System.Drawing.Drawing2D.LineCap.Round,
+        EndCap = System.Drawing.Drawing2D.LineCap.Round
+    };
     graphics.DrawEllipse(pen, centerX - radius, centerY - radius, radius * 2, radius * 2);
-
-    var buttonSize = Math.Max(3, size / 10f);
-    graphics.FillRectangle(darkBrush, centerX - buttonSize / 2, centerY - radius - buttonSize * 1.5f, buttonSize, buttonSize * 1.2f);
-    graphics.FillRectangle(darkBrush, centerX + radius * 0.5f - buttonSize / 2, centerY - radius * 0.9f - buttonSize / 2, buttonSize * 1.2f, buttonSize);
-
-    var angle = -Math.PI / 6;
-    var handLength = radius * 0.7f;
-    var endX = centerX + (float)(Math.Cos(angle) * handLength);
-    var endY = centerY + (float)(Math.Sin(angle) * handLength);
-    graphics.DrawLine(accentPen, centerX, centerY, endX, endY);
-
-    graphics.FillEllipse(darkBrush, centerX - thickness / 2, centerY - thickness / 2, thickness, thickness);
+    graphics.FillRectangle(faceBrush, size * 0.46f, size * 0.10f, size * 0.08f, size * 0.09f);
+    graphics.DrawLine(pen, size * 0.41f, size * 0.07f, size * 0.59f, size * 0.07f);
+    graphics.DrawLine(pen, centerX, centerY, size * 0.67f, size * 0.36f);
+    graphics.FillEllipse(faceBrush, centerX - thickness / 2, centerY - thickness / 2, thickness, thickness);
 
     return bitmap;
 }

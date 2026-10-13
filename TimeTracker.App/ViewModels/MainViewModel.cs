@@ -522,6 +522,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (_runningEntryId != entryId) return;
         await _repository.StopTimerAsync(entryId, endUtc).ConfigureAwait(true);
 
+        TimerDescription = string.Empty;
+        CloseDescriptionSuggestions("Timer");
+
         _runningEntryId = null;
         _recoveryPending = false;
         _pendingInterruption = null;
@@ -743,6 +746,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ResetRunningState()
     {
+        TimerDescription = string.Empty;
+        CloseDescriptionSuggestions("Timer");
         _runningEntryId = null;
         _pendingInterruption = null;
         _recoveryPending = false;
@@ -1127,12 +1132,12 @@ public sealed partial class MainViewModel : ObservableObject
         var items = SuggestionsFor(field);
         items.Clear();
         SetSuggestionState(field, false, -1);
-        if (recent ? !string.IsNullOrWhiteSpace(search) : string.IsNullOrWhiteSpace(search) || search.Length < 2) return;
+        if (recent ? !string.IsNullOrWhiteSpace(search) : string.IsNullOrWhiteSpace(search)) return;
         try
         {
             var descriptions = recent
                 ? (await _repository.GetRecentEntriesAsync(5)).Select(e => e.Description).ToList()
-                : await _repository.SearchDescriptionsAsync(search, 8);
+                : await _repository.SearchDescriptionsAsync(search.Trim(), 8);
             if (version != SuggestionVersion(field) || search != DescriptionFor(field)) return;
             foreach (var description in descriptions) items.Add(description);
             SetSuggestionState(field, items.Count > 0, items.Count > 0 ? 0 : -1);

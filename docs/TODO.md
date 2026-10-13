@@ -6,6 +6,21 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Maximize taskbar icon artwork: remove outer padding and enlarge the stopwatch within the badge (AR-031).
+
+- [x] Give the app icon an indigo badge and white stopwatch for light/dark Windows contrast (AR-030).
+
+- [x] Show 00:00:00 as the empty Initial duration field hint (AR-029).
+
+- [x] Always prevent duplicate executable-directory launches; permit other directories only with the launching copy's AllowMultipleInstances setting, default false (AR-027).
+- [x] Clear the timer description on successful stop and align Start/Stop with the input row (AR-028).
+
+- [ ] Reproduce and resolve typed search failing with longer text in all three fields (AR-026). Installed-build/database-snapshot tests show visible results; exact failing query/expected match and live popup inspection are still needed. The AR-025 cutoff change does not resolve this report.
+
+- [x] Remove the two-character typed-search cutoff and ignore outer query spaces; verify automatic visible results and retained input focus in all three fields after manual-section toggling (AR-025).
+
+- [x] Make Manual entry collapsible without losing drafts; keep its heading accessible while forms scroll and reduce top padding above Entries (AR-024).
+
 - [x] Explain every unfinished-task popup action beside its button, with matching tooltips/accessibility help and fallback/unavailable timestamp guidance (AR-023).
 
 - [x] Add unfinished-task recovery on unlock and app startup, with Continue / Stop at recorded time / Stop now, persistent interruption timestamps, and explicitly labeled activity fallback after abrupt exits (AR-022).

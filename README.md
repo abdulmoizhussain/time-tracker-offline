@@ -32,7 +32,7 @@ The author's original requests are preserved in [Author Requirements](docs/AUTHO
 - **Week-based browsing** — SQLite with WAL mode; the list queries one Monday–Sunday week at a time across the full database.
 - **Lock/unlock awareness** — optionally records Windows session lock/unlock events to help spot forgotten timers.
 - **Flexible duration input** — type `34`, `33:33`, `:33`, `1:02:30`, or `5.3` depending on what is fastest for you.
-- **Single instance** — launching the app a second time simply activates the existing window.
+- **Instance policy** — one instance per executable directory, always. A copy in another directory can run alongside an existing copy only when its own `appsettings.json` has `"AllowMultipleInstances": true` (default: `false`). Reopening the same copy activates its window. Applies within the current Windows user/session.
 - **Tested** — unit tests for parsing and data access, plus UI smoke tests that drive the real WPF app.
 
 ---
@@ -125,11 +125,11 @@ The app follows a layered MVVM architecture:
 
 ### Initial timer duration, unfinished-task recovery, and keyboard suggestions
 
-- Before starting a timer, optionally enter **Initial duration** beside its description. It accepts the manual duration formats, from zero to 23:59:59; blank starts from zero. Start is moved backward by that duration, and elapsed time continues from it. Created records the actual addition moment. The initial-duration draft clears after starting.
+- Before starting a timer, optionally enter **Initial duration** beside its description. It accepts the manual duration formats, from zero to 23:59:59; blank starts from zero and shows a `00:00:00` hint. Start is moved backward by that duration, and elapsed time continues from it. Created records the actual addition moment. The initial-duration draft clears after starting.
 - **Temporary policy pending author review:** an initial duration may place Start on the previous local day (for example, 2 hours at 01:00). Normal running timers can also cross midnight; reporting currently assigns their full duration to the Start date.
 - If a task was still running when you locked the PC, the app shows **Unfinished task** on unlock. A running task restored at app startup also shows the popup, including when launched from Windows startup into the tray. Actions are **Continue**, **Stop at recorded time**, and **Stop now**. Continue includes elapsed time during the interruption; stopping at its recorded time excludes the later gap. Each button has a visible explanation, tooltip, and accessibility help describing which time is counted; the recorded-time hint shows its exact timestamp or explains why it is unavailable. Escape/X acts as Continue. Closing the main window to the tray does not count as exiting the app.
 - Recovery timestamps are independent of optional lock/unlock history recording. Lock and full app exit are recorded; Windows shutdown/sign-out recording is best effort. While active, a checkpoint is saved about every 30 seconds. After a crash or power loss, the popup clearly labels that fallback as **last recorded activity**, not an exact shutdown time. Legacy running tasks without a recorded timestamp offer Continue/Stop now; stopping at a recorded time is disabled.
-- In any of the three description inputs, release **Down-arrow** while empty to show the **last five entries by Created**, newest first (repeated descriptions are retained). Typed searches retain their existing matching results. Keep focus in the input: **Up/Down** changes the highlighted result, **Enter** fills that description only, and **Escape** dismisses the popup. Enter does not add an entry or start a timer.
+- In any of the three description inputs, release **Down-arrow** while empty to show the **last five entries by Created**, newest first (repeated descriptions are retained). Typed searches show matching descriptions from the first nonblank character, ignoring outer spaces. Keep focus in the input: **Up/Down** changes the highlighted result, **Enter** fills that description only, and **Escape** dismisses the popup. Enter does not add an entry or start a timer.
 
 
 ### Modern desktop UI
@@ -152,6 +152,7 @@ The app follows a layered MVVM architecture:
 - Default timer description is configurable in-app (default: `Untitled task`).
 
 ### Manual Entries
+- Click **Manual entry** to collapse or expand both manual rows. Collapsing makes more space for the entry list and preserves both drafts. The section starts expanded.
 - Manual duration input must fit within **00:00:00–23:59:59 on the selected date** (maximum duration 23:59:59). Malformed, negative, overflowing, or out-of-range components are rejected with an inline message. Start Date is required; start/end times use 24-hour `H:mm` or `HH:mm:ss` with hours 0–23 and minutes/seconds 0–59. End must follow start on the same day; ambiguous/nonexistent clock-change times are rejected. Stop a running entry before changing its duration/date/times.
 - This input limit does not change existing/imported large durations: list cells, elapsed timers, totals, and JSON exports show full hours without wrapping at 24. Import allows durations above 24 hours within the existing integer-seconds storage range and reports skipped invalid/unrepresentable entries.
 - Both rows place a compact Start Date field first, followed by a wider Description field, then duration or time inputs.
@@ -181,6 +182,7 @@ The app follows a layered MVVM architecture:
 ### System Tray
 - Minimize-to-tray on close.
 - **File → Exit completely (including tray)** shuts down the whole app and removes its tray icon; the menu tooltip explains the difference from closing the main window with X.
+- The app icon uses a fixed indigo background filling the icon canvas and a large white stopwatch for visibility in light and dark Windows themes.
 - Tray icon turns red while tracking, green while idle.
 - Left-click opens a compact popup with elapsed time and start/stop control.
 - The popup opens beside the clicked tray area on that monitor, stays within its work area, and **Open App** restores the main window.
@@ -209,6 +211,7 @@ The app follows a layered MVVM architecture:
 
 ```json
 {
+  "AllowMultipleInstances": false,
   "Storage": {
     "DatabaseDirectory": "Data",
     "DatabaseFileName": "timetracker.db"
@@ -228,6 +231,7 @@ The app follows a layered MVVM architecture:
 
 | Section | Setting | Description |
 |---|---|---|
+| Root | `AllowMultipleInstances` | Allow this copy alongside another directory; never permits duplicates from the same directory. Default `false`. |
 | `Storage` | `DatabaseDirectory` | Folder for the SQLite file (relative to app base if not rooted) |
 | `Storage` | `DatabaseFileName` | SQLite file name |
 | `Hotkeys` | `Enabled` | Not yet wired up |
@@ -404,3 +408,5 @@ See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for common issues such 
 
 *Built with .NET 8, WPF, and SQLite.*
 
+
+Stopping a running entry clears the timer description for the next task, including stops from the entry list or unfinished-task popup. Start/Stop buttons align with the timer input row.

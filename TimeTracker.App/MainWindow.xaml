@@ -46,16 +46,26 @@
                     </Popup>
                 </Grid>
                 <TextBlock Grid.Column="1" Text="Initial duration" Style="{StaticResource MutedTextStyle}" Margin="0,0,20,4" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}" />
-                <TextBox Grid.Column="1" Grid.Row="1" Width="150" Margin="0,0,20,0" Text="{Binding TimerInitialDuration, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional: same formats as manual duration. Blank or 0 starts from zero; maximum 23:59:59." AutomationProperties.AutomationId="TimerInitialDurationTextBox" AutomationProperties.Name="Initial timer duration" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}" />
+                <Grid Grid.Column="1" Grid.Row="1" Width="150" Margin="0,0,20,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
+                    <TextBox x:Name="TimerInitialDurationTextBox" Text="{Binding TimerInitialDuration, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional: same formats as manual duration. Blank or 0 starts from zero; maximum 23:59:59." AutomationProperties.AutomationId="TimerInitialDurationTextBox" AutomationProperties.Name="Initial timer duration" />
+                    <TextBlock Text="00:00:00" Foreground="{DynamicResource MutedBrush}" Margin="9,0" VerticalAlignment="Center" IsHitTestVisible="False" Focusable="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=TimerInitialDurationTextBox}" Value=""><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
                 <StackPanel Grid.Column="1" Grid.RowSpan="2" VerticalAlignment="Center" Margin="0,0,20,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock Text="{Binding RunningElapsedText}" FontSize="32" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" TextAlignment="Right" />
                     <TextBlock Text="In progress" Foreground="{DynamicResource RunningTextBrush}" TextAlignment="Right" />
                 </StackPanel>
                 <TextBlock Grid.Row="2" Grid.ColumnSpan="3" Text="{Binding TimerError}" Style="{StaticResource InlineError}" AutomationProperties.AutomationId="TimerError" />
-                <Button Grid.Column="2" Grid.RowSpan="2" x:Name="StartTimerButton" AutomationProperties.AutomationId="StartTimerButton" AutomationProperties.Name="Start timer" Command="{Binding StartTimerCommand}" Style="{StaticResource PrimaryButtonStyle}" VerticalAlignment="Center" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
+                <Button Grid.Column="2" Grid.Row="1" x:Name="StartTimerButton" AutomationProperties.AutomationId="StartTimerButton" AutomationProperties.Name="Start timer" Command="{Binding StartTimerCommand}" Style="{StaticResource PrimaryButtonStyle}" VerticalAlignment="Center" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource PlayGeometry}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="10" Height="12" Stretch="Uniform" Margin="0,0,8,0" /><TextBlock Text="Start timer" /></StackPanel>
                 </Button>
-                <Button Grid.Column="2" Grid.RowSpan="2" x:Name="StopTimerButton" AutomationProperties.AutomationId="StopTimerButton" AutomationProperties.Name="Stop timer" Command="{Binding StopTimerCommand}" Style="{StaticResource StopButtonStyle}" VerticalAlignment="Center" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Button Grid.Column="2" Grid.Row="1" x:Name="StopTimerButton" AutomationProperties.AutomationId="StopTimerButton" AutomationProperties.Name="Stop timer" Command="{Binding StopTimerCommand}" Style="{StaticResource StopButtonStyle}" VerticalAlignment="Center" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}}">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource StopGeometry}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="10" Height="10" Stretch="Uniform" Margin="0,0,8,0" /><TextBlock Text="Stop timer" /></StackPanel>
                 </Button>
             </Grid>
@@ -63,12 +73,13 @@
 
         <Grid Grid.Row="2" Margin="16,0,16,0" x:Name="ComposerSpace">
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" MinHeight="100" /></Grid.RowDefinitions>
-            <ScrollViewer x:Name="ManualEntryScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MaxHeight="{Binding ActualHeight, ElementName=ComposerSpace, Converter={StaticResource ComposerHeightConverter}}">
-                <Border Style="{StaticResource SurfaceStyle}" Margin="0,0,0,6" Padding="16,4">
+            <Border Style="{StaticResource SurfaceStyle}" Margin="0,0,0,6" Padding="16,4" MaxHeight="{Binding ActualHeight, ElementName=ComposerSpace, Converter={StaticResource ComposerHeightConverter}}">
+                <Expander x:Name="ManualEntryExpander" IsExpanded="True" Collapsed="OnManualEntryCollapsed" AutomationProperties.AutomationId="ManualEntryExpander" AutomationProperties.Name="Manual entry">
+                    <Expander.Header><TextBlock Text="Manual entry" Style="{StaticResource SectionTitleStyle}" ToolTip="Expand or collapse manual entry to make more room for the list." /></Expander.Header>
+                    <ScrollViewer x:Name="ManualEntryScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Margin="0,4,0,0">
                     <Grid MinWidth="780">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="3.5*" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                        <TextBlock Text="Manual entry" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,2" Grid.ColumnSpan="4" />
                         <Button Grid.Column="4" Content="Cancel edit" Command="{Binding CancelEditCommand}" Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibilityConverter}}" />
                         <TextBlock Grid.Row="1" FontSize="13" FontWeight="SemiBold" Grid.ColumnSpan="5" Margin="0,0,0,4" TextWrapping="Wrap"><Run Text="By duration " /><Span FontSize="12" FontWeight="Normal" Foreground="{DynamicResource MutedBrush}"><Run Text="(34 = minutes · 1.5 = hours · 1 second–23:59:59. " /><Hyperlink Click="OnUsageClick">Duration help</Hyperlink><Run Text=")" /></Span></TextBlock>
                         <StackPanel Grid.Row="2" Margin="0,0,8,0"><TextBlock Text="Start Date" Style="{StaticResource FieldLabel}" /><DatePicker SelectedDate="{Binding ManualStartDate}" DateValidationError="OnManualDateValidationError" AutomationProperties.AutomationId="DurationStartDatePicker" /></StackPanel>
@@ -96,10 +107,11 @@
                         </StackPanel>
                         <TextBlock Grid.Row="7" Grid.ColumnSpan="5" Text="{Binding ManualRangeError}" Style="{StaticResource InlineError}" AutomationProperties.AutomationId="ManualRangeError" />
                     </Grid>
-                </Border>
-            </ScrollViewer>
+                    </ScrollViewer>
+                </Expander>
+            </Border>
 
-            <Border Grid.Row="1" Style="{StaticResource SurfaceStyle}" Padding="12">
+            <Border Grid.Row="1" Style="{StaticResource SurfaceStyle}" Padding="12,6,12,12">
                 <Grid x:Name="EntriesSpace">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <ScrollViewer x:Name="EntryHeaderScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MaxHeight="{Binding ActualHeight, ElementName=EntriesSpace, Converter={StaticResource ComposerHeightConverter}, ConverterParameter=Headers}">

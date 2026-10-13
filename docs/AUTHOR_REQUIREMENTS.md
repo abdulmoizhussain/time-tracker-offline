@@ -445,6 +445,119 @@ Relationship: refines AR-022's unfinished-task popup.
 
 Implementation notes (agent decisions): show an explanation beside each action, also exposed as its tooltip and accessibility help. Continue keeps counting time while away; Stop at recorded time excludes time after the displayed timestamp; Stop now includes time while away and ends at the current moment. Explain the last-activity fallback and why the recorded-time action is disabled when no timestamp exists. Continue's hint also explains Enter/Escape/X behavior. Applies to the shared unlock/startup popup.
 
+## AR-024 — Collapsible manual entry and tighter Entries heading spacing
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+manual entry section should be collapsible to make some more space for the listview.
+top margin of the listview heading (Entries) can be reduced a bit more.
+```
+
+Implementation notes (agent decisions): use an initially expanded, keyboard-accessible Expander for both manual rows. Collapsing releases space to the list and dismisses manual suggestion popups without clearing drafts. The section heading remains outside the forms' scroll area. Reduce the Entries card's top padding from 12 to 6 layout units, retaining side/bottom padding and existing UI scaling. Expanded/collapsed state lasts for the window session.
+
+## AR-025 — Investigate typing search appearing not to work
+
+Later correction: AR-026 confirms that longer text also fails in all three fields; the cutoff improvement is not a confirmed resolution of that report.
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original report (verbatim):
+
+> i beleive the search upon typing is no longer working.
+
+Relationship: follows AR-024's collapsible composer and AR-022's suggestion keyboard interactions.
+
+Investigation notes (agent observations): automatic typing with two or more characters returned visible results in all three fields in an isolated WPF focus test. The existing two-character cutoff prevented any results for one character; the author's exact failing query/field was not yet provided. Earlier checks explicitly invoked the search method and did not establish the automatic typing path.
+
+Implementation notes (agent decisions): allow typed matching from the first nonblank character and trim outer query spaces without changing the description draft. Keep version checks, recent-entry keyboard behavior, and selection handling. Validate automatic property-binding updates, actual popup visibility, and input focus after collapsing/reopening Manual entry, without explicitly invoking the search method.
+
+## AR-026 — Longer typing searches fail in all three description fields
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author's question replies in the current development conversation.
+
+Author's answers (verbatim; question context summarized separately):
+
+Which description fields fail:
+
+> All three fields
+
+Whether the failure also occurs with two or more characters:
+
+> It also fails with longer text
+
+Relationship: corrects the diagnosis associated with AR-025. Removing the two-character cutoff does not establish a fix for this report.
+
+Investigation notes (agent observations): the running app is the separately installed copy in TimeTrackerOffline, with binaries differing from the workspace build. Its own assemblies and a read-only snapshot of its database returned visible suggestions for a 12-character query through WPF TextComposition events in all three fields, with input focus retained. The reported failure is not yet reproduced. The Computer Use runtime could not initialize (Node startup status 0xc0000142), including after reset/retry, so live popup inspection was unavailable. The exact failing query and expected description were requested. Keep this issue open until reproduced and resolved; do not claim the cutoff improvement fixes it.
+
+## AR-027 — Directory-based instance policy
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+can we amend this to be like:
+
+- we must not be able to launch the multiple instances from the same directory -- lets ensure this without any configuration.
+- but if an instance is being launched whose exe location is different than the one currently running instance, then we should be checking a configuration from the appsettings that will be named like AllowMultipleInstances:true, only then we let the other instance launch.
+```
+
+Implementation notes (agent decisions): read the launching copy's root AllowMultipleInstances setting, default false. Keep the existing Windows user/session scope. Normalize the executable directory, independently of working directory or database path. Same-directory rejection occurs before reading configuration and activates that copy; denied other-directory launches activate an existing copy. Startup launches remain quiet. Serialize admission with a named mutex and retain directory/shared named presence handles in every admitted copy.
+
+## AR-028 — Clear stopped timer description and align timer buttons
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+next items,
+
+- upon stopping a running entry, the description box of the TimeTracker window should become empty.
+- vertically align the Start Timer / Stop Timer button.
+```
+
+Implementation notes (agent decisions): clear the description and dismiss its suggestions after a successful stop, including list and recovery stops. Center Start/Stop in the same grid row as the timer description/duration fields rather than across heading and input rows.
+
+## AR-029 — Initial duration placeholder
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> TimeTracker box > Initial duration field should have a placeholder/hint > `00:00:00`
+
+Implementation notes (agent decisions): show a muted, noninteractive hint inside the empty field, including while focused. Hide it when text is entered; leave the duration draft empty so existing blank-to-zero parsing is preserved.
+
+## AR-030 — App icon visibility in dark Windows themes
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+on dark theme of windows, the icon of this app is not so much visible.
+i think we should add a static relevant background color to its icon.
+or suggest me any better idea.
+```
+
+Implementation notes (agent decisions): use the app's indigo accent as a fixed rounded badge, with a white stopwatch and transparent outer corners. Retain all nine ICO resolutions (16–256 pixels). This updates the executable/window icon; the independent green/red tray status icons are unchanged.
+
+## AR-031 — Maximize taskbar icon artwork
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> the taskbar icon is very small, please maximize it. as much possible
+
+Relationship: refines AR-030's icon design.
+
+Implementation notes (agent decisions): remove the badge's outer padding so it fills the icon canvas, retaining rounded corners. Increase the stopwatch radius from 28% to 36% of the canvas and reposition its top button to fit safely. Windows determines the taskbar's icon slot size; these changes maximize the artwork within it. Preserve all nine ICO resolutions.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -458,7 +571,7 @@ Implementation notes (agent decisions): show an explanation beside each action, 
 ### Entry template
 
 ```markdown
-## AR-024 — Short subject
+## AR-032 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 

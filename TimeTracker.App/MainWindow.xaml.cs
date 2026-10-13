@@ -465,6 +465,13 @@ public partial class MainWindow : Window
         CloseSuggestionsAfterFocusLoss(sender);
     }
 
+    private void OnManualEntryCollapsed(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel viewModel) return;
+        viewModel.CloseDescriptionSuggestions("Manual");
+        viewModel.CloseDescriptionSuggestions("Range");
+    }
+
     private void CloseSuggestionsAfterFocusLoss(object sender)
     {
         if (sender is not System.Windows.Controls.TextBox { Tag: string field } textBox) return;

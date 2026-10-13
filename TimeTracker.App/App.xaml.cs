@@ -18,12 +18,10 @@ namespace TimeTracker.App;
 
 public partial class App : System.Windows.Application
 {
-    private const string MutexPrefix = "Local\\TimeTracker.SingleInstance.";
-    private const string EventPrefix = "Local\\TimeTracker.Activate.";
-
-    private Mutex? _singleInstanceMutex;
-    private EventWaitHandle? _activateEvent;
-    private RegisteredWaitHandle? _activateWaitHandle;
+    private AppInstanceGuard? _instanceGuard;
+    private RegisteredWaitHandle? _directoryActivateWait;
+    private RegisteredWaitHandle? _anyActivateWait;
+    private bool _activationRequested;
     private IHost? _host;
 
 
@@ -83,46 +81,26 @@ public partial class App : System.Windows.Application
     {
 
         var userSid = WindowsIdentity.GetCurrent().User?.Value ?? Environment.UserName;
-        var mutexName = MutexPrefix + userSid;
-        var eventName = EventPrefix + userSid;
-
-        _singleInstanceMutex = new Mutex(true, mutexName, out var createdNew);
-        if (!createdNew)
+        AppRuntimeOptions runtimeOptions = new();
+        _instanceGuard = await Task.Run(() => AppInstanceGuard.TryAcquire(
+            AppContext.BaseDirectory, userSid, () =>
+            {
+                var configuration = new ConfigurationBuilder()
+                    .SetBasePath(AppContext.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+                    .Build();
+                configuration.Bind(runtimeOptions);
+                return runtimeOptions.AllowMultipleInstances;
+            }, activateExisting: !WindowsStartupRegistration.IsStartupLaunch(e.Args)));
+        if (_instanceGuard is null)
         {
-            try
-            {
-                if (!WindowsStartupRegistration.IsStartupLaunch(e.Args))
-                {
-                    using var existingEvent = EventWaitHandle.OpenExisting(eventName);
-                    existingEvent.Set();
-                }
-            }
-            catch
-            {
-                // ignored
-            }
-
-            _singleInstanceMutex.Dispose();
-            _singleInstanceMutex = null;
             Shutdown();
             return;
         }
-
-        _activateEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
-        _activateWaitHandle = ThreadPool.RegisterWaitForSingleObject(
-            _activateEvent,
-            OnActivateRequested,
-            null,
-            Timeout.Infinite,
-            false);
-
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
-            .Build();
-
-        var runtimeOptions = new AppRuntimeOptions();
-        configuration.Bind(runtimeOptions);
+        _directoryActivateWait = ThreadPool.RegisterWaitForSingleObject(
+            _instanceGuard.DirectoryActivation, OnActivateRequested, null, Timeout.Infinite, false);
+        _anyActivateWait = ThreadPool.RegisterWaitForSingleObject(
+            _instanceGuard.AnyActivation, OnActivateRequested, null, Timeout.Infinite, false);
 
         ApplyUiScaling(runtimeOptions);
         ApplyHighContrastColors();
@@ -194,13 +172,17 @@ public partial class App : System.Windows.Application
         var mainWindow = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
         mainWindow.InitializeForLaunch(WindowsStartupRegistration.IsStartupLaunch(e.Args));
+        if (_activationRequested) mainWindow.ShowAndActivate();
         await mainWindow.ShowUnfinishedTaskAsync(startup: true);
     }
 
     private void OnActivateRequested(object? state, bool timedOut)
     {
-        Dispatcher.Invoke(() =>
+        if (Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(() =>
         {
+            if (Dispatcher.HasShutdownStarted) return;
+            _activationRequested = true;
             if (MainWindow is TimeTracker.App.MainWindow mainWindow)
             {
                 mainWindow.ShowAndActivate();
@@ -226,8 +208,9 @@ public partial class App : System.Windows.Application
     private async void OnExit(object sender, ExitEventArgs e)
     {
         SystemParameters.StaticPropertyChanged -= OnSystemAppearanceChanged;
-        _activateWaitHandle?.Unregister(null);
-        _activateEvent?.Dispose();
+        _directoryActivateWait?.Unregister(null);
+        _anyActivateWait?.Unregister(null);
+        _instanceGuard?.Dispose();
 
         if (_host is not null)
         {
@@ -235,8 +218,7 @@ public partial class App : System.Windows.Application
             _host.Dispose();
         }
 
-        _singleInstanceMutex?.ReleaseMutex();
-        _singleInstanceMutex?.Dispose();
+
     }
 
     private static void LogException(Exception exception, string source)
