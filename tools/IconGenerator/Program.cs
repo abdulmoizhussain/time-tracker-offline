@@ -31,20 +31,8 @@ static Bitmap DrawStopwatch(int size)
     var bitmap = new Bitmap(size, size);
     using var graphics = Graphics.FromImage(bitmap);
     graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-    graphics.Clear(Color.Transparent);
-
-    // A fixed badge keeps the stopwatch readable on light and dark Windows surfaces.
-    var inset = 0f; // Fill the entire taskbar icon canvas.
-    var corner = size * 0.18f;
-    var edge = size - inset;
-    using var badge = new System.Drawing.Drawing2D.GraphicsPath();
-    badge.AddArc(inset, inset, corner, corner, 180, 90);
-    badge.AddArc(edge - corner, inset, corner, corner, 270, 90);
-    badge.AddArc(edge - corner, edge - corner, corner, corner, 0, 90);
-    badge.AddArc(inset, edge - corner, corner, corner, 90, 90);
-    badge.CloseFigure();
-    using var background = new SolidBrush(Color.FromArgb(79, 70, 229)); // App's indigo accent.
-    graphics.FillPath(background, badge);
+    // Every pixel is opaque, including the corners, in each ICO frame and the EXE resource.
+    graphics.Clear(Color.FromArgb(79, 70, 229)); // App's indigo accent.
 
     var centerX = size * 0.50f;
     var centerY = size * 0.55f;

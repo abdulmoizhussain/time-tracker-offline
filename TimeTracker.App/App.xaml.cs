@@ -23,6 +23,7 @@ public partial class App : System.Windows.Application
     private RegisteredWaitHandle? _anyActivateWait;
     private bool _activationRequested;
     private IHost? _host;
+    private static string _dataDirectory = AppStoragePaths.DataRoot(new StorageOptions());
 
 
     public App()
@@ -105,27 +106,24 @@ public partial class App : System.Windows.Application
         ApplyUiScaling(runtimeOptions);
         ApplyHighContrastColors();
 
-        var databaseDirectory = runtimeOptions.Storage.DatabaseDirectory;
-        var databaseFileName = runtimeOptions.Storage.DatabaseFileName;
-
-        for (var i = 0; i < e.Args.Length - 1; i++)
+        var paths = AppStoragePaths.Resolve(runtimeOptions.Storage, AppContext.BaseDirectory,
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), e.Args);
+        _dataDirectory = paths.DataDirectory;
+        var databasePath = paths.DatabasePath;
+        try
         {
-            if (e.Args[i] == "--db-path" || e.Args[i] == "-db-path")
-            {
-                databaseDirectory = e.Args[i + 1];
-                databaseFileName = string.Empty;
-                break;
-            }
+            if (paths.LegacyDatabasePath is not null)
+                await LegacyDatabaseMigration.MigrateAsync(paths.LegacyDatabasePath, databasePath);
         }
-
-        if (!Path.IsPathRooted(databaseDirectory))
+        catch (Exception ex)
         {
-            databaseDirectory = Path.Combine(AppContext.BaseDirectory, databaseDirectory);
+            LogException(ex, "Database migration");
+            System.Windows.MessageBox.Show(
+                $"Your existing database could not be copied to the new data folder. TimeTracker will close so it does not start with an empty database. Your original files have been kept.\n\n{ex.Message}",
+                "TimeTracker data migration", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+            return;
         }
-
-        var databasePath = string.IsNullOrEmpty(databaseFileName)
-            ? databaseDirectory
-            : Path.Combine(databaseDirectory, databaseFileName);
 
         _host = Host.CreateDefaultBuilder(e.Args)
             .ConfigureServices(services =>
@@ -225,7 +223,8 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            var logPath = Path.Combine(AppContext.BaseDirectory, "TimeTracker.error.log");
+            Directory.CreateDirectory(_dataDirectory);
+            var logPath = Path.Combine(_dataDirectory, "TimeTracker.error.log");
             var builder = new StringBuilder();
             builder.AppendLine($"[{DateTime.UtcNow:O}] Unhandled exception from {source}");
             builder.AppendLine(exception.ToString());

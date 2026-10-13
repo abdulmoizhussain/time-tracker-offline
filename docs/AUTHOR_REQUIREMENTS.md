@@ -558,6 +558,43 @@ Relationship: refines AR-030's icon design.
 
 Implementation notes (agent decisions): remove the badge's outer padding so it fills the icon canvas, retaining rounded corners. Increase the stopwatch radius from 28% to 36% of the canvas and reposition its top button to fit safely. Windows determines the taskbar's icon slot size; these changes maximize the artwork within it. Preserve all nine ICO resolutions.
 
+## AR-032 — Remove remaining EXE icon transparency
+
+Recorded: 2026-10-13 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original report (verbatim):
+
+> the exe icon is still transparent.
+
+Relationship: supersedes the transparent rounded corners in AR-030/AR-031's implementation decisions.
+
+Implementation notes (agent decisions): fill the entire canvas with opaque indigo, including corners, while retaining the enlarged white stopwatch. Regenerate all ICO frames, rebuild the application, and verify the actual embedded EXE icon matches the new opaque frames. The separate installed copy is not replaced by a workspace build.
+
+## AR-033 — Store writable data outside the installation directory
+
+Recorded: 2026-10-14 (Asia/Karachi). Source: author messages in the current development conversation.
+
+Author's original question (verbatim):
+
+> hey, in these kind of apps, we usually use `%userprofile%\AppData\Local` this kind of directory for storing the app's data right? instead of saving it inside the installation directory.
+
+Author's authorization (verbatim):
+
+```text
+Ok lets do this work then ..
+because i just accidentally shift deleted my current installation directory's files of TimeTracker where i was maintaing the time logging for the last 4-5 days :/
+```
+
+Context (not an author quote): the preceding proposal was to switch the default to LocalAppData, keep a portable option, and migrate existing data on first launch.
+
+Implementation notes (agent decisions): default root `%LOCALAPPDATA%\TimeTracker`, database under `Data`, settings and error log under the root. PortableMode defaults false; true selects the executable directory as writable root. Absolute custom paths and --db-path are preserved; relative configured database folders now resolve under the writable root. Installation appsettings remains read-only configuration. Copy legacy SQLite data through the backup API, preserve its adjacent list preferences, serialize concurrent migrations, leave the source intact, and never overwrite a destination. Stop startup on migration errors. Different installation copies share the per-user database unless explicitly configured otherwise. No general backup/recovery feature is implied.
+
+Recovery authorization (verbatim answer to whether the discovered 22-entry snapshot should be restored to the new AppData location without replacing existing data):
+
+> Restore the recovered entries
+
+Recovery notes (agent observations): a retained database snapshot from the installed-app search investigation contains 22 real entries from October 12–13. A separate integrity-checked recovery copy was preserved, and its 22 entries were restored to the new default AppData database after author approval. All restored tables matched the recovery copy. This does not establish recovery of all lost days. Keep private log contents out of tracked documentation.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -571,7 +608,7 @@ Implementation notes (agent decisions): remove the badge's outer padding so it f
 ### Entry template
 
 ```markdown
-## AR-032 — Short subject
+## AR-034 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 

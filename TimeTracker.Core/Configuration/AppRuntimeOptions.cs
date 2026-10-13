@@ -12,6 +12,7 @@ public sealed class AppRuntimeOptions
 
 public sealed class StorageOptions
 {
+    public bool PortableMode { get; set; }
     public string DatabaseDirectory { get; set; } = "Data";
     public string DatabaseFileName { get; set; } = "timetracker.db";
 }

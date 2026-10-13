@@ -6,6 +6,10 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Store writable data in LocalAppData by default, support explicit portable mode, and safely copy legacy databases/preferences without overwriting or deleting data; restore the authorized 22-entry snapshot to the new default location (AR-033).
+
+- [x] Remove all icon transparency, including corners, and verify the rebuilt EXE embeds the opaque artwork (AR-032).
+
 - [x] Maximize taskbar icon artwork: remove outer padding and enlarge the stopwatch within the badge (AR-031).
 
 - [x] Give the app icon an indigo badge and white stopwatch for light/dark Windows contrast (AR-030).

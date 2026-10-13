@@ -1193,11 +1193,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private static string GetUserSettingsPath()
-    {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(localAppData, "TimeTracker", "user-settings.json");
-    }
+    private string GetUserSettingsPath()
+        => Path.Combine(AppStoragePaths.DataRoot(_options.Storage), "user-settings.json");
 
     private void ClearManualFields()
     {

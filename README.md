@@ -182,7 +182,7 @@ The app follows a layered MVVM architecture:
 ### System Tray
 - Minimize-to-tray on close.
 - **File → Exit completely (including tray)** shuts down the whole app and removes its tray icon; the menu tooltip explains the difference from closing the main window with X.
-- The app icon uses a fixed indigo background filling the icon canvas and a large white stopwatch for visibility in light and dark Windows themes.
+- The app icon uses a fully opaque indigo background filling the entire icon canvas, including its corners, and a large white stopwatch for visibility in light and dark Windows themes.
 - Tray icon turns red while tracking, green while idle.
 - Left-click opens a compact popup with elapsed time and start/stop control.
 - The popup opens beside the clicked tray area on that monitor, stays within its work area, and **Open App** restores the main window.
@@ -205,6 +205,12 @@ The app follows a layered MVVM architecture:
 
 ---
 
+By default, the database is `%LOCALAPPDATA%\TimeTracker\Data\timetracker.db`. Timer preferences (`user-settings.json`) and the error log live in `%LOCALAPPDATA%\TimeTracker`; list preferences stay beside the database. Deleting or replacing the installation directory therefore leaves these files intact.
+
+On first launch with the new storage behavior, an existing database in the old installation-relative folder is copied using SQLite's backup API, including WAL data, with its list preferences. The original remains untouched. An existing destination is never replaced or merged. A migration error stops startup rather than silently opening an empty database. Close the old app before upgrading so it cannot continue logging to the old database after the snapshot.
+
+Copies in different installation directories share this per-user database by default. Use distinct absolute `DatabaseDirectory` values or explicit portable mode if copies need separate logs. `--db-path` still selects an explicit database file (relative paths resolve beside the executable) and bypasses migration. `appsettings.json` remains installation configuration; the app does not write to it. This separation protects against deleting the installation, but it is not a backup against disk failure or deleting AppData.
+
 ## Configuration
 
 `appsettings.json` (copied to output):
@@ -213,6 +219,7 @@ The app follows a layered MVVM architecture:
 {
   "AllowMultipleInstances": false,
   "Storage": {
+    "PortableMode": false,
     "DatabaseDirectory": "Data",
     "DatabaseFileName": "timetracker.db"
   },
@@ -232,7 +239,8 @@ The app follows a layered MVVM architecture:
 | Section | Setting | Description |
 |---|---|---|
 | Root | `AllowMultipleInstances` | Allow this copy alongside another directory; never permits duplicates from the same directory. Default `false`. |
-| `Storage` | `DatabaseDirectory` | Folder for the SQLite file (relative to app base if not rooted) |
+| `Storage` | `PortableMode` | Default `false`: writable data lives in `%LOCALAPPDATA%\TimeTracker`. Set `true` only for an intentional portable copy that stores data beside its EXE. |
+| `Storage` | `DatabaseDirectory` | SQLite folder, relative to the data root unless absolute; default `Data`. Environment variables are expanded. |
 | `Storage` | `DatabaseFileName` | SQLite file name |
 | `Hotkeys` | `Enabled` | Not yet wired up |
 | `Hotkeys` | `StartStop` | Planned global hotkey |
