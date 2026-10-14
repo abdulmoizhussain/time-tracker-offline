@@ -4,6 +4,8 @@ A local-first, offline Windows desktop time-tracking application. It runs from t
 
 The author's original requests are preserved in [Author Requirements](docs/AUTHOR_REQUIREMENTS.md), with verbatim statements separated from implementation decisions and assumptions. Contributors and AI agents should consult it when checking feature intent and append new requirements as they are provided.
 
+The proposed approach for separating public and private material is documented in [Repository Privacy Plan](docs/REPOSITORY_PRIVACY_PLAN.md).
+
 ---
 
 ## Table of Contents

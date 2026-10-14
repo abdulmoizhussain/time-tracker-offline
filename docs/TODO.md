@@ -190,6 +190,10 @@ Original author statements and requirement history are maintained separately in 
 
 ## User Documentation
 
+- [ ] Review and implement [Repository Privacy Plan](REPOSITORY_PRIVACY_PLAN.md): select private files, use separate private storage, and assess existing Git history before any cleanup (AR-036).
+
+- [ ] Include open-source licensing documents: choose the project license, add a root `LICENSE` file, and include any required third-party license/attribution notices (AR-035).
+
 26. Create a README for new users covering:
     - What makes this app different from other time tracking apps
     - How to use the app

@@ -605,6 +605,29 @@ Author's original request (verbatim):
 
 Implementation notes (agent decisions): retain the red running / lime-green idle circle, but remove the one-eighth-size padding and dark outline so it fills the available canvas. Use Windows' small-icon metric as before; Windows controls the notification area's icon slot size. Preserve antialiasing and transparent corners outside the circle.
 
+## AR-035 — Add open-source licensing documents to the backlog
+
+Recorded: 2026-10-15 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> add a todo in this project that we have to include open source licensing documents in this project.
+
+Implementation notes (agent decisions): record a pending documentation task to choose the project license, add a root LICENSE file, and include required third-party license/attribution notices. No license is selected or adopted by this TODO.
+
+## AR-036 — Plan public/private repository file separation
+
+Recorded: 2026-10-15 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+also create a plan document for: we have make some files of this repo as private, if this is possible in github.
+some files public in a repo and some files in private.
+```
+
+Implementation notes (agent decisions): verify GitHub's repository-level visibility model against official documentation. Prepare a separate-private-repository plan, with owner-selected file classification, public build independence, and existing-history review. This request authorizes a plan, not file moves, remote repository changes, or history rewriting.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -618,7 +641,7 @@ Implementation notes (agent decisions): retain the red running / lime-green idle
 ### Entry template
 
 ```markdown
-## AR-035 — Short subject
+## AR-037 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 
