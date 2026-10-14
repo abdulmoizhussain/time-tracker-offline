@@ -595,6 +595,16 @@ Recovery authorization (verbatim answer to whether the discovered 22-entry snaps
 
 Recovery notes (agent observations): a retained database snapshot from the installed-app search investigation contains 22 real entries from October 12–13. A separate integrity-checked recovery copy was preserved, and its 22 entries were restored to the new default AppData database after author approval. All restored tables matched the recovery copy. This does not establish recovery of all lost days. Keep private log contents out of tracked documentation.
 
+## AR-034 — Maximize tray icon artwork
+
+Recorded: 2026-10-14 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> hey maximize the tray icon size as much you can.
+
+Implementation notes (agent decisions): retain the red running / lime-green idle circle, but remove the one-eighth-size padding and dark outline so it fills the available canvas. Use Windows' small-icon metric as before; Windows controls the notification area's icon slot size. Preserve antialiasing and transparent corners outside the circle.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -608,7 +618,7 @@ Recovery notes (agent observations): a retained database snapshot from the insta
 ### Entry template
 
 ```markdown
-## AR-034 — Short subject
+## AR-035 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 

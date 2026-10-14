@@ -6,6 +6,8 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Maximize the tray status circle within Windows' icon canvas, removing outer padding and the dark outline (AR-034).
+
 - [x] Store writable data in LocalAppData by default, support explicit portable mode, and safely copy legacy databases/preferences without overwriting or deleting data; restore the authorized 22-entry snapshot to the new default location (AR-033).
 
 - [x] Remove all icon transparency, including corners, and verify the rebuilt EXE embeds the opaque artwork (AR-032).
@@ -114,7 +116,7 @@ Original author statements and requirement history are maintained separately in 
 
 5. Replace the `?` labels on the Start/Stop buttons with play/stop icons or emojis.
 
-6. Maximize the size of the tray icon and make both red and green colors very bright/prominent.
+6. [x] Maximize the size of the tray icon and make both red and green colors very bright/prominent. Completed in AR-034.
 
 ## Timer & Entries
 

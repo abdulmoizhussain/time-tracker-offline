@@ -161,12 +161,10 @@ public partial class MainWindow : Window
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.Clear(System.Drawing.Color.Transparent);
 
-        var padding = Math.Max(1, size / 8);
-        var rect = new Rectangle(padding, padding, size - padding * 2 - 1, size - padding * 2 - 1);
+        // Windows controls the tray slot size; use its full canvas without an outer margin.
+        var rect = new RectangleF(0, 0, size, size);
         using var brush = new SolidBrush(color);
         graphics.FillEllipse(brush, rect);
-        using var outlinePen = new Pen(System.Drawing.Color.FromArgb(40, 0, 0, 0), Math.Max(1, size / 16f));
-        graphics.DrawEllipse(outlinePen, rect);
 
         return System.Drawing.Icon.FromHandle(bitmap.GetHicon());
     }

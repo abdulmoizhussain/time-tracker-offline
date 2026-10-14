@@ -183,7 +183,7 @@ The app follows a layered MVVM architecture:
 - Minimize-to-tray on close.
 - **File → Exit completely (including tray)** shuts down the whole app and removes its tray icon; the menu tooltip explains the difference from closing the main window with X.
 - The app icon uses a fully opaque indigo background filling the entire icon canvas, including its corners, and a large white stopwatch for visibility in light and dark Windows themes.
-- Tray icon turns red while tracking, green while idle.
+- Tray icon turns bright red while tracking, lime green while idle; the circle fills the available Windows tray icon canvas without outer padding.
 - Left-click opens a compact popup with elapsed time and start/stop control.
 - The popup opens beside the clicked tray area on that monitor, stays within its work area, and **Open App** restores the main window.
 - Right-click menu for Open / Launch at startup / Exit.
