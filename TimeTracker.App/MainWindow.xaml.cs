@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -20,8 +22,9 @@ public partial class MainWindow : Window
     private readonly ImportExportHistoryWindow _importExportHistoryWindow;
     private NotifyIcon? _notifyIcon;
     private TrayPopupWindow? _trayPopup;
-    private ToolStripMenuItem? _startupTrayMenuItem;
+    // private ToolStripMenuItem? _startupTrayMenuItem; // Startup registration disabled (AR-039).
     private bool _isExiting;
+    private bool _restoringEntryLayout;
     private bool _showingUnfinishedTimer;
     private UnfinishedTimerWindow? _unfinishedTimerWindow;
 
@@ -30,6 +33,12 @@ public partial class MainWindow : Window
         _screenEventsWindow = screenEventsWindow;
         _importExportHistoryWindow = importExportHistoryWindow;
         InitializeComponent();
+        DataContextChanged += (_, _) => RestoreEntryLayout();
+        var view = (GridView)EntriesListView.View;
+        ((INotifyCollectionChanged)view.Columns).CollectionChanged += (_, _) => CaptureEntryLayout();
+        foreach (var column in view.Columns)
+            DependencyPropertyDescriptor.FromProperty(GridViewColumn.WidthProperty, typeof(GridViewColumn))
+                .AddValueChanged(column, OnEntryColumnWidthChanged);
         LoadWindowIcon();
         Loaded += OnLoaded;
         Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -82,14 +91,16 @@ public partial class MainWindow : Window
 
         var contextMenu = new ContextMenuStrip();
         contextMenu.Items.Add("Open", null, (sender, e) => ShowAndActivate());
+        /* Startup registration disabled (AR-039).
         _startupTrayMenuItem = new ToolStripMenuItem("Launch at startup");
         _startupTrayMenuItem.Click += (_, _) => ToggleLaunchAtStartup();
         contextMenu.Items.Add(_startupTrayMenuItem);
         contextMenu.Opening += (_, _) => RefreshStartupMenus();
+        */
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add("Exit", null, (sender, e) => ExitApplication());
         _notifyIcon.ContextMenuStrip = contextMenu;
-        RefreshStartupMenus();
+        // RefreshStartupMenus(); // Startup registration disabled (AR-039).
 
         ViewModel.PropertyChanged += (sender, e) =>
         {
@@ -111,6 +122,7 @@ public partial class MainWindow : Window
         }
     }
 
+    /* Startup registration disabled (AR-039); retained only as source comments.
     private void RefreshStartupMenus()
     {
         try
@@ -147,12 +159,14 @@ public partial class MainWindow : Window
             System.Windows.MessageBox.Show($"Could not update Windows startup registration.\n\n{ex.Message}",
                 "Launch at startup", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        RefreshStartupMenus();
+        // RefreshStartupMenus(); // Startup registration disabled (AR-039).
     }
 
     private void OnLaunchAtStartupClick(object sender, RoutedEventArgs e) => ToggleLaunchAtStartup();
 
     private void OnFileMenuOpened(object sender, RoutedEventArgs e) => RefreshStartupMenus();
+
+    */
 
     private static Icon CreateCircleIcon(int size, System.Drawing.Color color)
     {
@@ -195,6 +209,7 @@ public partial class MainWindow : Window
         _unfinishedTimerWindow?.Close();
         try { await ViewModel.CaptureTimerInterruptionAsync(TimerInterruptionReason.Exit, DateTime.UtcNow); }
         catch (Exception ex) { System.Windows.MessageBox.Show($"Could not record the exit time: {ex.Message}", "Timer recovery"); }
+        CaptureEntryLayout();
         await ViewModel.SaveEntryQueryPreferencesAsync();
         _notifyIcon?.Dispose();
         Application.Current.Shutdown();
@@ -209,6 +224,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         Hide();
+        CaptureEntryLayout();
         await ViewModel.SaveEntryQueryPreferencesAsync();
     }
 
@@ -239,6 +255,8 @@ public partial class MainWindow : Window
                     if (_isExiting || DataContext is not MainViewModel viewModel) return;
                     if (eventType == "Lock")
                     {
+                        CaptureEntryLayout();
+                        await viewModel.SaveEntryQueryPreferencesAsync();
                         try { await viewModel.CaptureTimerInterruptionAsync(TimerInterruptionReason.Lock, occurredUtc); }
                         catch (Exception ex) { viewModel.TimerError = $"Could not save lock time: {ex.Message}"; }
                     }
@@ -256,12 +274,19 @@ public partial class MainWindow : Window
     {
         _isExiting = true;
         _unfinishedTimerWindow?.Close();
+        CaptureEntryLayout();
+        await ViewModel.SaveEntryQueryPreferencesAsync();
         await ViewModel.CaptureTimerInterruptionAsync(TimerInterruptionReason.Shutdown, DateTime.UtcNow);
     }
 
     public async Task ShowUnfinishedTaskAsync(bool startup)
     {
-        if (_showingUnfinishedTimer || _isExiting) return;
+        if (_isExiting) return;
+        if (_showingUnfinishedTimer)
+        {
+            _unfinishedTimerWindow?.BringToFront();
+            return;
+        }
         _showingUnfinishedTimer = true;
         try
         {
@@ -293,6 +318,9 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        foreach (var column in ((GridView)EntriesListView.View).Columns)
+            DependencyPropertyDescriptor.FromProperty(GridViewColumn.WidthProperty, typeof(GridViewColumn))
+                .RemoveValueChanged(column, OnEntryColumnWidthChanged);
         Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         _notifyIcon?.Dispose();
         base.OnClosed(e);
@@ -383,13 +411,24 @@ public partial class MainWindow : Window
         ViewModel.EditEntryCommand.Execute(entry);
     }
 
-    private void OnEntriesSizeChanged(object sender, SizeChangedEventArgs e)
+    private void RestoreEntryLayout()
     {
-        // Keep all metadata available, and give surplus width to the description.
-        if (DescriptionColumn is not null)
-        {
-            DescriptionColumn.Width = Math.Max(210, e.NewSize.Width - 925);
-        }
+        if (DataContext is not MainViewModel viewModel) return;
+        _restoringEntryLayout = true;
+        try { EntryGridLayout.Apply((GridView)EntriesListView.View, viewModel.EntryColumns); }
+        finally { _restoringEntryLayout = false; }
+    }
+
+    private void OnEntryColumnWidthChanged(object? sender, EventArgs e)
+    {
+        if (_restoringEntryLayout) return;
+        Dispatcher.BeginInvoke(CaptureEntryLayout, DispatcherPriority.Background);
+    }
+
+    private void CaptureEntryLayout()
+    {
+        if (!_restoringEntryLayout && DataContext is MainViewModel viewModel)
+            viewModel.UpdateEntryColumnLayout(EntryGridLayout.Capture((GridView)EntriesListView.View));
     }
 
     private void OnTimerDescriptionGotFocus(object sender, RoutedEventArgs e)

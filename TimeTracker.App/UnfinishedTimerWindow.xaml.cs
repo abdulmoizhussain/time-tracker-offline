@@ -29,6 +29,17 @@ public partial class UnfinishedTimerWindow : Window
         DataContext = this;
     }
 
+    public void BringToFront()
+    {
+        if (!IsVisible) return;
+        WindowState = WindowState.Normal;
+        Topmost = true;
+        Activate();
+        Focus();
+    }
+
+    private void OnContentRendered(object? sender, EventArgs e) => BringToFront();
+
     private void OnContinue(object sender, RoutedEventArgs e) => Close();
     private void OnRecordedStop(object sender, RoutedEventArgs e) { Action = UnfinishedTimerAction.StopAtRecordedTime; Close(); }
     private void OnStopNow(object sender, RoutedEventArgs e) { Action = UnfinishedTimerAction.StopNow; Close(); }

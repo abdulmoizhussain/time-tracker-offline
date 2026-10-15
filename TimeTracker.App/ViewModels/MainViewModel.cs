@@ -54,6 +54,12 @@ public sealed partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _entriesLoadCancellation;
     private string? _entryPreferencesPath;
     private readonly SemaphoreSlim _preferencesGate = new(1, 1);
+    private readonly DispatcherTimer _preferencesSaveTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private bool _entryPreferencesLoaded;
+    public EntryColumnLayout[] EntryColumns { get; private set; } = [];
+
+    [ObservableProperty]
+    private bool _isManualEntryExpanded = true;
 
     [ObservableProperty]
     private string _entryPreferencesError = string.Empty;
@@ -141,6 +147,7 @@ public sealed partial class MainViewModel : ObservableObject
         RangeSuggestions = new ObservableCollection<string>();
 
         LoadDefaultTimerDescription();
+        _preferencesSaveTimer.Tick += async (_, _) => await SaveEntryQueryPreferencesAsync();
 
         PropertyChanged += (sender, e) =>
         {
@@ -148,7 +155,9 @@ public sealed partial class MainViewModel : ObservableObject
                 or nameof(FilterStatus) or nameof(SelectedEntrySort) or nameof(SortDescending))
             {
                 OnPropertyChanged(nameof(HasPendingEntryQuery));
+                ScheduleEntryPreferencesSave();
             }
+            if (e.PropertyName is nameof(IsFiltersExpanded) or nameof(IsManualEntryExpanded)) ScheduleEntryPreferencesSave();
             if (e.PropertyName is nameof(IsEntriesLoading) or nameof(EntryQueryError))
             {
                 OnPropertyChanged(nameof(ShowEmptyEntries));
@@ -271,13 +280,30 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedEntrySort = Enum.IsDefined(draft.Sort) ? draft.Sort : TimeEntrySort.Start;
         SortDescending = draft.Descending;
         IsFiltersExpanded = preferences.FiltersExpanded;
+        IsManualEntryExpanded = preferences.ManualEntryExpanded;
+        EntryColumns = preferences.Columns ?? [];
+        _entryPreferencesLoaded = true;
         NotifyEntryQueryState();
         await LoadEntriesAsync(resetPage: true);
         await RestoreRunningTimerAsync();
     }
 
+    public void UpdateEntryColumnLayout(EntryColumnLayout[] columns)
+    {
+        EntryColumns = columns;
+        ScheduleEntryPreferencesSave();
+    }
+
+    private void ScheduleEntryPreferencesSave()
+    {
+        if (!_entryPreferencesLoaded) return;
+        _preferencesSaveTimer.Stop();
+        _preferencesSaveTimer.Start();
+    }
+
     public async Task SaveEntryQueryPreferencesAsync()
     {
+        _preferencesSaveTimer.Stop();
         if (_entryPreferencesPath is null) return;
         await _preferencesGate.WaitAsync();
         try
@@ -297,7 +323,9 @@ public sealed partial class MainViewModel : ObservableObject
                     Description = FilterDescription, FromDate = FilterFromDate, ToDate = FilterToDate,
                     Status = FilterStatus, Sort = SelectedEntrySort, Descending = SortDescending
                 },
-                FiltersExpanded = IsFiltersExpanded
+                FiltersExpanded = IsFiltersExpanded,
+                ManualEntryExpanded = IsManualEntryExpanded,
+                Columns = EntryColumns.Length == 0 ? null : EntryColumns
             }.SaveAsync(_entryPreferencesPath);
             EntryPreferencesError = string.Empty;
         }

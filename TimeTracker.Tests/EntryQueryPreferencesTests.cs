@@ -8,6 +8,26 @@ namespace TimeTracker.Tests;
 public sealed class EntryQueryPreferencesTests
 {
     [Fact]
+    public async Task LayoutAndManualToggleRoundTripWithBackwardCompatibleDefaults()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"TimeTracker.Layout.{Guid.NewGuid()}.json");
+        try
+        {
+            var columns = new[] { new EntryColumnLayout("description", 321), new EntryColumnLayout("timer", 65) };
+            await new EntryQueryPreferences { ManualEntryExpanded = false, Columns = columns }.SaveAsync(path);
+            var restored = await EntryQueryPreferences.LoadAsync(path);
+            Assert.False(restored.ManualEntryExpanded);
+            Assert.Equal(columns, restored.Columns);
+            await File.WriteAllTextAsync(path, "{\"Applied\":{},\"Draft\":{},\"FiltersExpanded\":true}");
+            restored = await EntryQueryPreferences.LoadAsync(path);
+            Assert.True(restored.ManualEntryExpanded);
+            Assert.True(restored.FiltersExpanded);
+            Assert.Null(restored.Columns);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
     public async Task PreferencesRoundTripAndRecoverFromCorruptOrInvalidAppliedState()
     {
         var path = Path.Combine(Path.GetTempPath(), $"TimeTracker.View.{Guid.NewGuid()}.json");

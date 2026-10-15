@@ -8,6 +8,8 @@ using System.Windows.Threading;
 using Microsoft.Extensions.Options;
 using TimeTracker.App;
 using TimeTracker.App.ViewModels;
+using TimeTracker.App.Helpers;
+using TimeTracker.Core.Models;
 using TimeTracker.Core.Configuration;
 using TimeTracker.Data;
 
@@ -53,6 +55,8 @@ internal static class Program
         var main = new MainWindow(new ScreenEventsWindow(), new ImportExportHistoryWindow()) { DataContext = vm };
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
         AssertTimerButtonAlignment(main, "StartTimerButton", "TimerDescriptionTextBox");
+        AssertEntryAlignment(main);
+        VerifyViewRestart(main, vm, repository, database, output);
         vm.TimerInitialDuration = "1.5";
         var expandedListHeight = ((ListView)main.FindName("EntriesListView")).ActualHeight;
         var manualExpander = (Expander)main.FindName("ManualEntryExpander");
@@ -114,7 +118,7 @@ internal static class Program
             foreach (var error in diagnostics.Errors.Distinct()) Console.Error.WriteLine(error);
             throw new InvalidOperationException("WPF binding errors detected during preview.");
         }
-        Console.WriteLine($"Rendered sixteen previews to {output}; no WPF binding errors.");
+        Console.WriteLine($"Rendered eighteen previews to {output}; no WPF binding errors.");
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(database);
         File.Delete(database + "-wal");
@@ -130,6 +134,93 @@ internal static class Program
         _ = task.ContinueWith(_ => dispatcher.BeginInvoke(() => frame.Continue = false));
         Dispatcher.PushFrame(frame);
         task.GetAwaiter().GetResult();
+    }
+
+    private static void VerifyViewRestart(MainWindow main, MainViewModel vm, TimeEntryRepository repository, string database, string output)
+    {
+        var view = (GridView)((ListView)main.FindName("EntriesListView")).View;
+        Wait(vm.SaveEntryQueryPreferencesAsync());
+        var baseline = File.ReadAllText(database + ".view.json");
+        var description = view.Columns.Single(column => EntryGridLayout.GetColumnKey(column) == "description");
+        description.Width = 300;
+        Wait(Task.Delay(1500));
+        if (File.ReadAllText(database + ".view.json") != baseline) throw new InvalidOperationException("Column resize saved too early.");
+        description.Width = 310;
+        Wait(Task.Delay(1500));
+        if (File.ReadAllText(database + ".view.json") != baseline) throw new InvalidOperationException("Column resize did not reset the debounce.");
+        Wait(Task.Delay(1900));
+        var resizedPreferences = EntryQueryPreferences.LoadAsync(database + ".view.json"); Wait(resizedPreferences);
+        if (resizedPreferences.Result.Columns?.Single(column => column.Key == "description").Width != 310)
+            throw new InvalidOperationException("Final resize was not persisted after the idle delay.");
+        view.Columns.Move(1, 3);
+        vm.IsManualEntryExpanded = false;
+        vm.IsFiltersExpanded = true;
+        vm.FilterDescription = "Deep";
+        vm.FilterStatus = "Completed";
+        vm.SelectedEntrySort = TimeEntrySort.Modified;
+        vm.SortDescending = false;
+        Wait(vm.ApplyEntryFiltersCommand.ExecuteAsync(null));
+        vm.FilterDescription = "Review"; // Pending draft must not replace the applied query.
+        Wait(Task.Delay(3400)); // Pump the dispatcher; verify automatic saving without close/exit.
+        var restored = new MainViewModel(repository, repository, Options.Create(new AppRuntimeOptions()));
+        Wait(restored.InitializeAsync(database));
+        if (restored.IsManualEntryExpanded || !restored.IsFiltersExpanded || restored.FilterDescription != "Review"
+            || restored.FilterStatus != "Completed" || restored.SelectedEntrySort != TimeEntrySort.Modified || restored.SortDescending
+            || !restored.HasPendingEntryQuery || restored.Entries.Count != 1 || !restored.Entries[0].Description.Contains("Deep"))
+            throw new InvalidOperationException("Filter/manual state did not survive a view-model restart.");
+        var reopened = CreateMain(restored);
+        Render(reopened, 1100, 760, Path.Combine(output, "main-restored-layout.png"));
+        var restoredView = (GridView)((ListView)reopened.FindName("EntriesListView")).View;
+        if (EntryGridLayout.GetColumnKey(restoredView.Columns[3]) != "timer"
+            || restoredView.Columns.Single(column => EntryGridLayout.GetColumnKey(column) == "description").Width != 310)
+            throw new InvalidOperationException("Column order/width did not survive restart.");
+        AssertEntryAlignment(reopened);
+        Render(reopened, 960, 650, Path.Combine(output, "main-restored-resized.png"));
+        if (restoredView.Columns.Single(column => EntryGridLayout.GetColumnKey(column) == "description").Width != 310)
+            throw new InvalidOperationException("Resizing overwrote a restored column width.");
+        vm.IsManualEntryExpanded = true;
+        vm.IsFiltersExpanded = false;
+        Wait(vm.ResetEntryFiltersCommand.ExecuteAsync(null));
+        Console.WriteLine("Verified automatic saving and restart of columns, widths, applied/pending filters, and Manual entry state.");
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match) yield return match;
+            foreach (var descendant in Descendants<T>(child)) yield return descendant;
+        }
+    }
+
+    private static void AssertEntryAlignment(MainWindow window)
+    {
+        var list = (ListView)window.FindName("EntriesListView");
+        var view = (GridView)list.View;
+        var row = Descendants<GridViewRowPresenter>(list).First();
+        var root = (FrameworkElement)window.Content;
+        foreach (var column in view.Columns)
+        {
+            var header = Descendants<GridViewColumnHeader>(list).First(h => h.Column == column);
+            var cell = Descendants<ContentPresenter>(row).First(c => c.ContentTemplate == column.CellTemplate);
+            double actual, expected;
+            if (EntryGridLayout.GetColumnKey(column) == "timer")
+            {
+                var button = Descendants<Button>(cell).Single();
+                actual = button.TranslatePoint(new Point(button.ActualWidth / 2, 0), root).X;
+                expected = header.TranslatePoint(new Point(header.ActualWidth / 2, 0), root).X;
+            }
+            else
+            {
+                FrameworkElement text = Descendants<TextBox>(cell).Cast<FrameworkElement>().FirstOrDefault()
+                    ?? Descendants<TextBlock>(cell).First();
+                actual = text.TranslatePoint(text is TextBox box ? box.GetRectFromCharacterIndex(0).TopLeft : new Point(), root).X;
+                expected = header.TranslatePoint(new Point(header.Padding.Left, 0), root).X;
+            }
+            Console.WriteLine($"Column {EntryGridLayout.GetColumnKey(column)} alignment offset: {actual - expected:F2}");
+            if (Math.Abs(actual - expected) > 1) throw new InvalidOperationException($"Column {column.Header} is misaligned.");
+        }
     }
 
     private static void AssertTimerButtonAlignment(MainWindow window, string buttonName, string inputName)

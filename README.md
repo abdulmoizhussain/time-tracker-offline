@@ -128,6 +128,7 @@ The app follows a layered MVVM architecture:
 ### Initial timer duration, unfinished-task recovery, and keyboard suggestions
 
 - Before starting a timer, optionally enter **Initial duration** beside its description. It accepts the manual duration formats, from zero to 23:59:59; blank starts from zero and shows a `00:00:00` hint. Start is moved backward by that duration, and elapsed time continues from it. Created records the actual addition moment. The initial-duration draft clears after starting.
+- The unfinished-task popup opens activated and topmost on unlock/startup, staying above other regular windows until a choice is made. If it was already open when the PC locked again, unlocking brings it forward again.
 - **Temporary policy pending author review:** an initial duration may place Start on the previous local day (for example, 2 hours at 01:00). Normal running timers can also cross midnight; reporting currently assigns their full duration to the Start date.
 - If a task was still running when you locked the PC, the app shows **Unfinished task** on unlock. A running task restored at app startup also shows the popup, including when launched from Windows startup into the tray. Actions are **Continue**, **Stop at recorded time**, and **Stop now**. Continue includes elapsed time during the interruption; stopping at its recorded time excludes the later gap. Each button has a visible explanation, tooltip, and accessibility help describing which time is counted; the recorded-time hint shows its exact timestamp or explains why it is unavailable. Escape/X acts as Continue. Closing the main window to the tray does not count as exiting the app.
 - Recovery timestamps are independent of optional lock/unlock history recording. Lock and full app exit are recorded; Windows shutdown/sign-out recording is best effort. While active, a checkpoint is saved about every 30 seconds. After a crash or power loss, the popup clearly labels that fallback as **last recorded activity**, not an exact shutdown time. Legacy running tasks without a recorded timestamp offer Continue/Stop now; stopping at a recorded time is disabled.
@@ -139,7 +140,7 @@ The app follows a layered MVVM architecture:
 - A shared light theme uses indigo actions, white surfaces, readable Segoe UI text, consistent controls, and vector Play/Stop icons across the main window, tray popup, and dialogs.
 - The timer stays accessible above the scrollable manual-entry area. Both entry methods remain independent; compact or scaled windows allow scrolling instead of shrinking fields.
 - Description search and sorting stay visible. **Filters** expands date/status controls; its count shows applied conditions. **Changes pending** identifies edits awaiting **Apply**. Week navigation remains accessible outside the filter scroller.
-- The entry table uses single-line timestamps, left-aligned full durations, running row highlights, and a description column that grows with the window. Metadata remains accessible through horizontal scrolling.
+- The entry table uses single-line timestamps, left-aligned full durations, running row highlights, and a description column with a saved user-selected width. Metadata remains accessible through horizontal scrolling.
 - Expand **Stored locally · database details** to select/copy the full path. Remove/Clear confirmations share the theme and default to Cancel.
 - The design reference is [UI_PLAN.md](docs/UI_PLAN.md). `tools/UiPreview` renders actual WPF content with isolated sample data for layout review.
 
@@ -154,7 +155,7 @@ The app follows a layered MVVM architecture:
 - Default timer description is configurable in-app (default: `Untitled task`).
 
 ### Manual Entries
-- Click **Manual entry** to collapse or expand both manual rows. Collapsing makes more space for the entry list and preserves both drafts. The section starts expanded.
+- Click **Manual entry** to collapse or expand both manual rows. Collapsing makes more space for the entry list and preserves both drafts. It starts expanded until you save a different toggle state; that state restores on the next launch.
 - Manual duration input must fit within **00:00:00–23:59:59 on the selected date** (maximum duration 23:59:59). Malformed, negative, overflowing, or out-of-range components are rejected with an inline message. Start Date is required; start/end times use 24-hour `H:mm` or `HH:mm:ss` with hours 0–23 and minutes/seconds 0–59. End must follow start on the same day; ambiguous/nonexistent clock-change times are rejected. Stop a running entry before changing its duration/date/times.
 - This input limit does not change existing/imported large durations: list cells, elapsed timers, totals, and JSON exports show full hours without wrapping at 24. Import allows durations above 24 hours within the existing integer-seconds storage range and reports skipped invalid/unrepresentable entries.
 - Both rows place a compact Start Date field first, followed by a wider Description field, then duration or time inputs.
@@ -166,8 +167,8 @@ The app follows a layered MVVM architecture:
 - Duration box and start/end time boxes auto-sync on focus loss.
 
 ### Entry List
-- Header column separators are darker and thicker. Entry values are left-aligned except centered ID and Timer cells.
-- Applied filters and sort selections restore on the next launch. Pending selections are preserved separately when closing/exiting, so they still require Apply. Preferences are saved beside the database as `<database path>.view.json`; Reset persists the defaults. A missing/corrupt preferences file falls back to defaults.
+- Header column separators are darker and thicker. Entry values, including ID, align with header text; only Timer buttons are centered.
+- Applied filters and sort selections restore on the next launch. Pending selections are preserved separately, so they still require Apply. Column order, column widths, the Filters toggle, and the Manual entry toggle also restore per database. Changes save in a background task after three seconds without further view changes; every column resize restarts that delay. Closing, exiting, or locking flushes pending settings. Resizing the window does not override chosen column widths. Preferences are saved beside the database as `<database path>.view.json`; Reset persists the defaults. A missing/corrupt preferences file falls back to defaults.
 - Running entries are highlighted with an amber background and border, semibold text, and an “In progress” tooltip when visible in the current week/filter. The highlight is removed when the timer stops.
 - Grouped by date with human-readable headers: *Today*, *Yesterday*, weekday names, or full date.
 - Daily completed duration shown at the left of each group header, immediately beside Today/Yesterday/the date label.
@@ -177,6 +178,7 @@ The app follows a layered MVVM architecture:
 - Right-click an entry for **Edit entry**, **Remove entry** (with confirmation) and, if running, **Stop running entry**. Actions target the clicked row, even if another row is selected. Saving re-applies the current list filters/sort/week; an edited entry can disappear if its new description no longer matches. Duration/start-date editing in the popup is deferred.
 - The row's timer button shows **▶** for completed entries and **■** for running entries. Clicking **■** stops that entry and refreshes timer indicators and the current filtered week.
 - **Older week / Newer week** navigation includes a week date range and page count. The default first page is the current week (or the latest week if future-dated entries exist); empty intervening weeks remain navigable.
+- Row values align with their column headers, including ID; row timer buttons are centered in their columns.
 - Filter by description text, inclusive local From/To dates, and All/Running/Completed status. Click **Apply** to reload the newest matching week; **Reset** clears filters and restores default sorting. Blank dates impose no date limit. Description searches treat `%` and `_` literally.
 - Sort by Start, Description, Duration, Created, or Modified, ascending or descending. Daily groups stay newest-first; the chosen sort applies **within each day**. Equal values use entry ID as a stable tie-breaker. Filters and sorting persist while navigating or refreshing after changes.
 - Daily and weekly totals show completed duration for the filtered entries. The footer also shows this week's entry count and the total matching count across the database.
@@ -188,9 +190,8 @@ The app follows a layered MVVM architecture:
 - Tray icon turns bright red while tracking, lime green while idle; the circle fills the available Windows tray icon canvas without outer padding.
 - Left-click opens a compact popup with elapsed time and start/stop control.
 - The popup opens beside the clicked tray area on that monitor, stays within its work area, and **Open App** restores the main window.
-- Right-click menu for Open / Launch at startup / Exit.
-- Toggle **File → Launch at startup** or the same checked option in the tray right-click menu. Both reflect the current user's Windows Run registration; enabling launches this copy quietly in the tray after sign-in, while normal launches open the main window. Lock/unlock recording continues in the background when enabled in configuration.
-- Registration is opt-in and uses only the `TimeTracker` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`; no administrator access is normally required. Disabling removes only that value. Keep the executable in a stable built/published location; if moving it, disable registration first and enable again from the new location. Windows Startup Apps/Task Manager or organization policy can independently disable startup execution, even while the Run value remains registered.
+- Right-click menu for Open / Exit.
+- **Launch at startup is disabled (AR-039):** its File/tray controls and registry access are commented out and excluded from all builds while investigating Apex One detections. Existing Windows startup registrations are not removed automatically. The `--startup` argument remains supported for existing registrations or manual launches; lock/unlock recording is unchanged.
 
 ### Import / Export
 - Export first offers an optional local date range (inclusive). Leave the option off for all completed entries, or leave an individual boundary blank for an open-ended range. It uses Start date, falling back to End/Created, independently of list filters and pagination. Running entries are excluded. Only then choose the destination directory/filename in the save-file dialog. Exports are not capped to 10,000 records.
@@ -309,6 +310,8 @@ See [`docs/TESTING.md`](docs/TESTING.md) for detailed instructions on writing an
 ---
 
 ## Publish
+
+For the proposed Authenticode workflow, see [Release signing plan](docs/RELEASE_SIGNING_PLAN.md). Signing is not yet configured.
 
 Self-contained release for Windows x64:
 

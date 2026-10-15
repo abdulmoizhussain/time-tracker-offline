@@ -628,6 +628,64 @@ some files public in a repo and some files in private.
 
 Implementation notes (agent decisions): verify GitHub's repository-level visibility model against official documentation. Prepare a separate-private-repository plan, with owner-selected file classification, public build independence, and existing-history review. This request authorizes a plan, not file moves, remote repository changes, or history rewriting.
 
+## AR-037 — Persist view layout, align cells, and foreground recovery
+
+Recorded: 2026-10-16 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+1. &#x20;The rearrangement/repositioning of header columns should persist the app restarts.
+   1. The width sizing of each column should also persist.
+   2. Selecting filters should also persist.
+   3. The manual entry toggle state should also persist.
+2. Left alignment of the column value of each column has some more margin. while the header values' left margin is different and good enough. lets make column values left aligned and align them just like the header's left alignment. Except only for the Timer columns button alignment, make the Time button of every row properly center aligned, currently it doesn't seem to be properly center aligned.
+3. The window after unlock / restart should be on top. to be visible very first thing after unlocking the screen.
+
+
+
+Let me know if there is any confusion in any point.
+```
+
+Relationship: extends AR-013's saved filter/sort choices, AR-024's Manual entry toggle, and AR-022's recovery popup. Supersedes AR-013's centered ID cells and AR-024's session-only expansion decision.
+
+Implementation notes (agent decisions): store stable column IDs/order/widths and Manual entry expansion in the database's existing .view.json preferences file. Preserve applied queries and pending drafts separately. Unknown column IDs and invalid saved widths fall back safely; old settings files default to Manual entry expanded. Remove automatic Description width resizing. Match the existing header text inset, remove grouping indentation mismatch, and draw the row status border without consuming column space. Interpret the window request as the unfinished-task popup: show it activated/topmost until dismissed and raise an existing popup again after unlock. Windows secure-desktop and actual foreground behavior require interactive verification.
+
+## AR-038 — Debounce column resizing and save in the background
+
+Recorded: 2026-10-16 (Asia/Karachi). Source: author steering message during AR-037 implementation.
+
+Author's original request (verbatim):
+
+> dont' persist right after resizing the column, give it a little time like 2-3 seconds after every resize then trigger the persistence in background task.
+
+Implementation notes (agent decisions): use a three-second trailing debounce for view preference changes; every resize resets the timer. Serialize the snapshot and write/replace the settings file on a background task using a unique temporary filename. Close, exit, lock, and shutdown still explicitly flush pending settings so an immediate app exit does not discard them.
+
+## AR-039 — Disable startup registration while investigating Apex One
+
+Recorded: 2026-10-16 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> ok lets take only one step at this time. lets comment the code of: launch at startup. so that the code never gets to the release, and never gets detected by ApexOne.
+
+Relationship: supersedes AR-015's active startup registration controls. The original authorization remains preserved above.
+
+Implementation notes (agent decisions): comment out registry constants/read/write methods and both File/tray registration controls and handlers, excluding them from Debug and Release compilation. Keep pure command-formatting and `--startup` argument handling for compatibility with existing registrations and tests. Existing Windows registry entries are not changed. Removing this possible detection trigger does not guarantee that Apex One will allow the application; the precise detection still requires logs.
+
+## AR-040 — Plan Authenticode release signing
+
+Recorded: 2026-10-16 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+tell me and create plan document as well for this: how can i sign the relase?
+`Consider Authenticode signing for distributed releases. It provides a verifiable publisher identity; it does not guarantee that behavior policies will allow the app.`
+```
+
+Implementation notes (agent decisions): create RELEASE_SIGNING_PLAN.md using current Microsoft guidance and the existing self-contained folder publish profile. Cover identity/provider eligibility, final first-party binaries, SHA-256 signing, timestamping, verification, credentials, and separate Apex One validation. This request authorizes explanation and planning only, not enrollment, purchases, certificate creation, or signing implementation.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.
@@ -641,7 +699,7 @@ Implementation notes (agent decisions): verify GitHub's repository-level visibil
 ### Entry template
 
 ```markdown
-## AR-037 — Short subject
+## AR-041 — Short subject
 
 Recorded: YYYY-MM-DD. Source: author message in the current development conversation.
 

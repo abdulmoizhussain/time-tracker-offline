@@ -6,6 +6,16 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Document Authenticode release-signing options, prerequisites, publish/sign/verify sequence, and Apex One limitations (AR-040); see RELEASE_SIGNING_PLAN.md.
+- [ ] Select an eligible signing provider and implement/validate release signing after author approval of the plan (AR-040).
+
+- [x] Comment out Launch at startup menu controls and registry access in all builds while investigating Apex One detections; retain existing `--startup` launch handling (AR-039). Earlier AR-015 registration implementation is superseded.
+
+- [x] Persist column order/widths and Manual entry state; automatically save filter drafts/toggles alongside applied queries. Debounce view changes for three seconds and write in a background task, flushing on close/exit/lock (AR-037/AR-038).
+- [x] Align row text, including ID, with column headers; center timer buttons without shifting columns for the row status border or grouping indent (AR-037).
+- [x] Activate unfinished-task recovery popups as topmost at startup/unlock and raise an already open popup again on unlock (AR-037).
+- [ ] Verify recovery popup foreground behavior during an actual Windows lock/unlock and startup session (AR-037); offline previews cannot prove Windows foreground focus behavior.
+
 - [x] Maximize the tray status circle within Windows' icon canvas, removing outer padding and the dark outline (AR-034).
 
 - [x] Store writable data in LocalAppData by default, support explicit portable mode, and safely copy legacy databases/preferences without overwriting or deleting data; restore the authorized 22-entry snapshot to the new default location (AR-033).

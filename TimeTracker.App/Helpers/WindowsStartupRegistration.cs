@@ -1,13 +1,15 @@
 using System.IO;
-using Microsoft.Win32;
+// using Microsoft.Win32; // Startup registration disabled (AR-039).
 
 namespace TimeTracker.App.Helpers;
 
 public static class WindowsStartupRegistration
 {
     public const string StartupArgument = "--startup";
+    /* Startup registry access disabled (AR-039); retained only as source comments.
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "TimeTracker";
+    */
 
     public static bool IsStartupLaunch(IEnumerable<string> arguments) =>
         arguments.Contains(StartupArgument, StringComparer.OrdinalIgnoreCase);
@@ -28,6 +30,7 @@ public static class WindowsStartupRegistration
         return command;
     }
 
+    /* Startup registry access disabled (AR-039); excluded from every build.
     public static bool IsEnabled()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
@@ -53,4 +56,5 @@ public static class WindowsStartupRegistration
         using var key = Registry.CurrentUser.CreateSubKey(RunKey, writable: true);
         key.SetValue(ValueName, command, RegistryValueKind.String);
     }
+    */
 }

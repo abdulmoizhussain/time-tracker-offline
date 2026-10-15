@@ -31,6 +31,8 @@ public sealed record EntryQueryPreferences
     public EntryQuerySelection Applied { get; init; } = new();
     public EntryQuerySelection Draft { get; init; } = new();
     public bool FiltersExpanded { get; init; }
+    public bool ManualEntryExpanded { get; init; } = true;
+    public EntryColumnLayout[]? Columns { get; init; }
 
     public static async Task<EntryQueryPreferences> LoadAsync(string path)
     {
@@ -45,12 +47,16 @@ public sealed record EntryQueryPreferences
         }
     }
 
-    public async Task SaveAsync(string path)
+    public Task SaveAsync(string path) => Task.Run(async () =>
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
         Directory.CreateDirectory(directory);
-        var temporary = path + ".tmp";
-        await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(temporary, path, overwrite: true);
-    }
+        var temporary = path + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true })).ConfigureAwait(false);
+            File.Move(temporary, path, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    });
 }
