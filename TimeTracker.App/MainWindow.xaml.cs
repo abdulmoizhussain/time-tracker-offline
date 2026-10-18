@@ -527,6 +527,12 @@ public partial class MainWindow : Window
     private void OnDescriptionPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (sender is not System.Windows.Controls.TextBox { Tag: string field } textBox) return;
+        // Holding Enter after accepting a suggestion must not also start the timer.
+        if (field == "Timer" && e.Key == Key.Enter && e.IsRepeat)
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Escape && ViewModel.SuggestionsOpen(field))
         {
             ViewModel.CloseDescriptionSuggestions(field);
@@ -544,7 +550,19 @@ public partial class MainWindow : Window
             textBox.CaretIndex = textBox.Text.Length;
             e.Handled = true;
         }
+        else if (field == "Timer" && e.Key == Key.Enter) OnTimerStartPreviewKeyDown(sender, e);
         else if (e.Key == Key.Down && string.IsNullOrWhiteSpace(textBox.Text)) e.Handled = true;
+    }
+
+    private void OnTimerStartPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        if (e.IsRepeat || ViewModel.IsTimerRunning || string.IsNullOrWhiteSpace(ViewModel.TimerDescription) ||
+            !ViewModel.StartTimerCommand.CanExecute(null)) return;
+
+        ViewModel.CloseDescriptionSuggestions("Timer");
+        ViewModel.StartTimerCommand.Execute(null);
     }
 
     private async void OnDescriptionPreviewKeyUp(object sender, System.Windows.Input.KeyEventArgs e)

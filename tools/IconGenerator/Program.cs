@@ -35,20 +35,45 @@ static Bitmap DrawStopwatch(int size)
     graphics.Clear(Color.FromArgb(79, 70, 229)); // App's indigo accent.
 
     var centerX = size * 0.50f;
-    var centerY = size * 0.55f;
-    var radius = size * 0.36f;
-    var thickness = Math.Max(1.25f, size * 0.07f);
+    var centerY = size * 0.555f;
+    var radius = size * 0.425f;
+    var thickness = size * 0.065f;
     using var faceBrush = new SolidBrush(Color.White);
-    using var pen = new Pen(Color.White, thickness)
+    using var rimBrush = new SolidBrush(Color.FromArgb(30, 27, 75));
+    using var tickPen = new Pen(Color.FromArgb(100, 116, 139), size * 0.035f)
     {
         StartCap = System.Drawing.Drawing2D.LineCap.Round,
         EndCap = System.Drawing.Drawing2D.LineCap.Round
     };
-    graphics.DrawEllipse(pen, centerX - radius, centerY - radius, radius * 2, radius * 2);
-    graphics.FillRectangle(faceBrush, size * 0.46f, size * 0.10f, size * 0.08f, size * 0.09f);
-    graphics.DrawLine(pen, size * 0.41f, size * 0.07f, size * 0.59f, size * 0.07f);
-    graphics.DrawLine(pen, centerX, centerY, size * 0.67f, size * 0.36f);
-    graphics.FillEllipse(faceBrush, centerX - thickness / 2, centerY - thickness / 2, thickness, thickness);
+    using var hourPen = new Pen(Color.FromArgb(30, 27, 75), thickness)
+    {
+        StartCap = System.Drawing.Drawing2D.LineCap.Round,
+        EndCap = System.Drawing.Drawing2D.LineCap.Round
+    };
+    using var secondPen = new Pen(Color.FromArgb(79, 70, 229), size * 0.045f)
+    {
+        StartCap = System.Drawing.Drawing2D.LineCap.Round,
+        EndCap = System.Drawing.Drawing2D.LineCap.Round
+    };
+    // Keep the badge edge-to-edge; a large white dial makes the stopwatch readable at taskbar sizes.
+    graphics.FillRectangle(faceBrush, size * 0.455f, size * 0.07f, size * 0.09f, size * 0.09f);
+    graphics.FillRectangle(faceBrush, size * 0.36f, size * 0.015f, size * 0.28f, size * 0.065f);
+    graphics.FillEllipse(rimBrush, centerX - radius, centerY - radius, radius * 2, radius * 2);
+    var faceRadius = radius - size * 0.035f;
+    graphics.FillEllipse(faceBrush, centerX - faceRadius, centerY - faceRadius, faceRadius * 2, faceRadius * 2);
+
+    for (var tick = 0; tick < 4; tick++)
+    {
+        var angle = tick * MathF.PI / 2;
+        var inner = faceRadius - size * 0.07f;
+        var outer = faceRadius - size * 0.025f;
+        graphics.DrawLine(tickPen,
+            centerX + MathF.Cos(angle) * inner, centerY + MathF.Sin(angle) * inner,
+            centerX + MathF.Cos(angle) * outer, centerY + MathF.Sin(angle) * outer);
+    }
+    graphics.DrawLine(hourPen, centerX, centerY, size * 0.35f, size * 0.30f);
+    graphics.DrawLine(secondPen, centerX, centerY, size * 0.72f, size * 0.34f);
+    graphics.FillEllipse(rimBrush, centerX - thickness / 2, centerY - thickness / 2, thickness, thickness);
 
     return bitmap;
 }

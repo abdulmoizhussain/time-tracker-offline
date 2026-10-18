@@ -686,6 +686,40 @@ tell me and create plan document as well for this: how can i sign the relase?
 
 Implementation notes (agent decisions): create RELEASE_SIGNING_PLAN.md using current Microsoft guidance and the existing self-contained folder publish profile. Cover identity/provider eligibility, final first-party binaries, SHA-256 signing, timestamping, verification, credentials, and separate Apex One validation. This request authorizes explanation and planning only, not enrollment, purchases, certificate creation, or signing implementation.
 
+## AR-041 — White stopwatch dial and full-size app icon
+
+Recorded: 2026-10-18 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim excerpt; icon bullet only):
+
+```text
+- we need to improve the app icon. the current does resemble with the app-them but its icon should have some white background thingy. a proper and clear clock/stopwatch type icon, just like the one in the old app `C:\Users\Abdul\Documents\dev\logiciel\TimeTracker`. Don't change the tray icon, it is perfect. Changes to be made for the app icon, but the app should not have any surrounding paddings, should be full sized.
+```
+
+Relationship: refines AR-030/031/032's app icon; preserves AR-034's tray icon.
+
+Implementation notes (agent decisions): adapt the existing code-based icon generator using the old app's white dial, hour marks, and two hands as reference. Keep the app's indigo background fully opaque and edge-to-edge, enlarge the white face, and retain all nine ICO resolutions. The tray icon code is unchanged.
+
+## AR-042 — Enter starts a described timer after suggestion selection
+
+Recorded: 2026-10-18 (Asia/Karachi). Source: author message and question reply in the current development conversation.
+
+Author's original request (verbatim excerpt; keyboard bullet only):
+
+```text
+- when the user is trying to start a timer. they type something in the description (i.e. whenever the description box is non-empty) then upon pressing the enter key, it should start the timer right away. and also when the user has typed some description and now the cursor is in the Initial Duration box, there as well when the user presses the enter key it should start the timer. BUT before implementing this, do let me know if this behaviour conflicts with any current implementation?
+```
+
+Context (agent explanation, not an author quote): reported that Enter already accepts highlighted suggestions under AR-022; Initial duration had no Enter action. Asked which behavior to use when the timer suggestion popup is open before implementation.
+
+Author's selected answer (verbatim):
+
+> Accept the suggestion first; press Enter again to start (recommended).
+
+Relationship: refines AR-022's Enter behavior for the timer description; manual-entry suggestion selection is unchanged.
+
+Implementation notes (agent decisions): when suggestions are closed, Enter in the timer description starts through the existing Start command. Initial duration uses the same command on Enter. Both require non-whitespace description text, preserve duration validation, and guard against running/concurrent starts and key repeats. Suggestion acceptance consumes the first Enter; a separate second press starts. Blank descriptions can still use the Start button's default-description behavior.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

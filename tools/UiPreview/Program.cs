@@ -56,6 +56,7 @@ internal static class Program
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
         AssertTimerButtonAlignment(main, "StartTimerButton", "TimerDescriptionTextBox");
         AssertEntryAlignment(main);
+        VerifyTimerEnter(main, vm);
         VerifyViewRestart(main, vm, repository, database, output);
         vm.TimerInitialDuration = "1.5";
         var expandedListHeight = ((ListView)main.FindName("EntriesListView")).ActualHeight;
@@ -125,6 +126,51 @@ internal static class Program
         File.Delete(database + "-shm");
         File.Delete(database + ".view.json");
         File.Delete(database + ".view.json.tmp");
+    }
+
+    private static void VerifyTimerEnter(MainWindow main, MainViewModel vm)
+    {
+        using var source = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Timer keyboard checks"));
+        void Enter(string control)
+        {
+            var box = (TextBox)main.FindName(control);
+            box.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+                source, Environment.TickCount, System.Windows.Input.Key.Enter)
+            {
+                RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
+            });
+            if (vm.StartTimerCommand.ExecutionTask is { } task) Wait(task);
+        }
+
+        vm.TimerDescription = "   ";
+        Enter("TimerDescriptionTextBox");
+        Enter("TimerInitialDurationTextBox");
+        if (vm.IsTimerRunning) throw new InvalidOperationException("Blank-description Enter started a timer.");
+
+        vm.TimerDescription = "Keyboard timer check";
+        Wait(Task.Delay(250));
+        vm.TimerSuggestions.Clear();
+        vm.TimerSuggestions.Add("Accepted keyboard suggestion");
+        vm.TimerSuggestionIndex = 0;
+        vm.IsTimerSuggestionsOpen = true;
+        Enter("TimerDescriptionTextBox");
+        if (vm.IsTimerRunning || vm.TimerDescription != "Accepted keyboard suggestion" || vm.IsTimerSuggestionsOpen)
+            throw new InvalidOperationException("Enter did not accept the suggestion without starting.");
+        Enter("TimerDescriptionTextBox");
+        if (!vm.IsTimerRunning) throw new InvalidOperationException("Second Enter did not start the timer.");
+        Wait(vm.StopTimerCommand.ExecuteAsync(null));
+
+        vm.TimerDescription = "Duration keyboard check";
+        vm.TimerInitialDuration = "invalid";
+        Enter("TimerInitialDurationTextBox");
+        if (vm.IsTimerRunning || string.IsNullOrEmpty(vm.TimerError))
+            throw new InvalidOperationException("Enter bypassed initial-duration validation.");
+        vm.TimerInitialDuration = "1:30";
+        Enter("TimerInitialDurationTextBox");
+        if (!vm.IsTimerRunning || vm.RunningElapsedText != "00:01:30")
+            throw new InvalidOperationException("Duration-field Enter did not start with the supplied duration.");
+        Wait(vm.StopTimerCommand.ExecuteAsync(null));
+        Console.WriteLine("Timer Enter checks passed: blank input, suggestion selection, second Enter, invalid duration, seeded start.");
     }
 
     private static void Wait(Task task)

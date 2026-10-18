@@ -48,7 +48,7 @@
                 </Grid>
                 <TextBlock Grid.Column="1" Text="Initial duration" Style="{StaticResource MutedTextStyle}" Margin="0,0,20,4" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}" />
                 <Grid Grid.Column="1" Grid.Row="1" Width="150" Margin="0,0,20,0" Visibility="{Binding IsTimerRunning, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}">
-                    <TextBox x:Name="TimerInitialDurationTextBox" Text="{Binding TimerInitialDuration, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional: same formats as manual duration. Blank or 0 starts from zero; maximum 23:59:59." AutomationProperties.AutomationId="TimerInitialDurationTextBox" AutomationProperties.Name="Initial timer duration" />
+                    <TextBox x:Name="TimerInitialDurationTextBox" PreviewKeyDown="OnTimerStartPreviewKeyDown" Text="{Binding TimerInitialDuration, UpdateSourceTrigger=PropertyChanged}" ToolTip="Optional: same formats as manual duration. Blank or 0 starts from zero; maximum 23:59:59. Press Enter to start when the description has text." AutomationProperties.AutomationId="TimerInitialDurationTextBox" AutomationProperties.Name="Initial timer duration" />
                     <TextBlock Text="00:00:00" Foreground="{DynamicResource MutedBrush}" Margin="9,0" VerticalAlignment="Center" IsHitTestVisible="False" Focusable="False">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
