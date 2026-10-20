@@ -56,6 +56,7 @@ internal static class Program
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
         AssertTimerButtonAlignment(main, "StartTimerButton", "TimerDescriptionTextBox");
         AssertEntryAlignment(main);
+        VerifyRowSelection(main, vm, output);
         VerifyTimerEnter(main, vm);
         VerifyViewRestart(main, vm, repository, database, output);
         vm.TimerInitialDuration = "1.5";
@@ -126,6 +127,43 @@ internal static class Program
         File.Delete(database + "-shm");
         File.Delete(database + ".view.json");
         File.Delete(database + ".view.json.tmp");
+    }
+
+    private static void VerifyRowSelection(MainWindow main, MainViewModel vm, string output)
+    {
+        var list = (ListView)main.FindName("EntriesListView");
+        var rows = Descendants<ListViewItem>(list).ToArray();
+        var sameDay = rows.GroupBy(row => ((TimeEntryViewModel)row.DataContext).GroupDate).First(group => group.Count() >= 2).ToArray();
+        if (Equals(sameDay[0].Background, sameDay[1].Background))
+            throw new InvalidOperationException("Same-day rows do not alternate backgrounds.");
+
+        var row = sameDay[0];
+        var description = Descendants<TextBox>(row).Single();
+        description.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.Input.Mouse.PreviewMouseDownEvent
+        });
+        if (!row.IsSelected || vm.SelectedEntry != row.DataContext || description.SelectionLength != 0)
+            throw new InvalidOperationException("Description click did not select only the whole row.");
+        if (row.IsKeyboardFocusWithin || !Equals(row.Background, Application.Current.FindResource("SelectedRowBrush")))
+            throw new InvalidOperationException("Selected row background requires keyboard focus.");
+        description.Select(0, Math.Min(4, description.Text.Length));
+        if (description.SelectedText.Length == 0) throw new InvalidOperationException("Description copying is no longer available.");
+        description.Select(0, 0);
+        Render(main, 1100, 760, Path.Combine(output, "main-selected-striped.png"));
+
+        var selectedId = vm.SelectedEntry!.Id;
+        var oldItem = vm.SelectedEntry;
+        Wait(vm.ApplyEntryFiltersCommand.ExecuteAsync(null));
+        if (vm.SelectedEntry?.Id != selectedId || ReferenceEquals(vm.SelectedEntry, oldItem))
+            throw new InvalidOperationException("Selection was not restored to the reloaded entry.");
+        vm.FilterDescription = "no matching entry for selection check";
+        Wait(vm.ApplyEntryFiltersCommand.ExecuteAsync(null));
+        if (vm.SelectedEntry is not null) throw new InvalidOperationException("Filtered-out entry remains selected.");
+        Wait(vm.ResetEntryFiltersCommand.ExecuteAsync(null));
+        Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
+        Console.WriteLine("Row checks passed: zebra stripes, description click selects whole row, inactive selection, text copying, refresh restoration, filtered-out selection.");
     }
 
     private static void VerifyTimerEnter(MainWindow main, MainViewModel vm)

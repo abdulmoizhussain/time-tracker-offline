@@ -365,11 +365,13 @@ public sealed partial class MainViewModel : ObservableObject
             _newestWeek = newest;
             _oldestWeek = oldest;
             _weekStart = week;
+            var selectedId = SelectedEntry?.Id;
             Entries.Clear();
             foreach (var entry in entries)
             {
                 Entries.Add(TimeEntryViewModel.FromModel(entry));
             }
+            SelectedEntry = Entries.FirstOrDefault(entry => entry.Id == selectedId);
             var totalSeconds = entries.Where(e => !e.IsRunning).Sum(e => (long)e.DurationSeconds);
             WeekTotalText = $"{(filter.IsActive ? "Filtered completed total" : "Completed this week")}: {DurationFormatter.HoursMinutes(totalSeconds)}";
             EmptyEntriesText = filter.IsActive ? "No matching entries in this week" : "No entries this week";

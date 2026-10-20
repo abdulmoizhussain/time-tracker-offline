@@ -720,6 +720,32 @@ Relationship: refines AR-022's Enter behavior for the timer description; manual-
 
 Implementation notes (agent decisions): when suggestions are closed, Enter in the timer description starts through the existing Start command. Initial duration uses the same command on Enter. Both require non-whitespace description text, preserve duration validation, and guard against running/concurrent starts and key repeats. Suggestion acceptance consumes the first Enter; a separate second press starts. Blank descriptions can still use the Start button's default-description behavior.
 
+## AR-043 — Persistent whole-row highlighting and zebra stripes
+
+Recorded: 2026-10-20 (Asia/Karachi). Source: author messages in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+hi, every list item should be single click highlight-able, so that if a user is trying to highlight an entry do something based on it on a differnt window/screen based on that entry, then that entry should stay highlighted. but doing this work should not affect no other functionality, do let me know first after the analysis.
+along with this work, if we can also do: zebra striping / row stripping, for the same better visibility purposes.
+```
+
+Context (agent analysis, not an author quote): explained that description TextBoxes can consume clicks without selecting their rows, the existing selection style is independent of focus, and reloads replace entry objects. Proposed full-row selection, restoration after reload while visible, day-group zebra stripes, and preservation of existing interactions; no code changed before this explanation.
+
+Author's correction and approval (verbatim):
+
+```text
+Single-click anywhere on ordinary row content selects that entry, while preserving description text selection/copying.
+NO, dont do content highlighting just do complete row highlighting with a different and very light shade color. any color other than zebra stripping.
+
+other points are find.
+```
+
+Relationship: refines AR-005/010/020's selection and running-row appearance. Existing description copying, double-click editing, timer controls, context menus, and manual drafts remain.
+
+Implementation notes (agent decisions): a single selected row uses light lavender, distinct from white/light-gray stripes restarting per day. Clicking description content selects the enclosing row without automatically selecting text or consuming the mouse event. Explicit text selection/copying remains available. Selection uses IsSelected independently of keyboard/window focus, overrides stripe/hover backgrounds, and retains the running row's amber border. Reloads restore selection by stable entry ID when present; deletion, filters, or week navigation removing the entry clear selection. No selection persistence across app restarts is introduced.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

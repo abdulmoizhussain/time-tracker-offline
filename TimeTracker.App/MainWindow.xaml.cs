@@ -393,6 +393,21 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnEntryPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.ListView list || e.OriginalSource is not DependencyObject source ||
+            ItemsControl.ContainerFromElement(list, source) is not System.Windows.Controls.ListViewItem row) return;
+
+        // Select the full row even when the description TextBox handles the click.
+        // Leave the event and focus alone so text copying, double-click editing, and controls still work.
+        for (var element = source; element is not null && element != row;
+             element = System.Windows.Media.VisualTreeHelper.GetParent(element))
+        {
+            if (element is System.Windows.Controls.Primitives.ButtonBase) return;
+        }
+        row.IsSelected = true;
+    }
+
     private void OnEntryDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left || sender is not System.Windows.Controls.ListView list ||

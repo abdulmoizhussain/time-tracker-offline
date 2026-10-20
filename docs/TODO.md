@@ -6,6 +6,8 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Add full-row single-click lavender selection, including clicks in descriptions, retained across focus changes and refreshes when visible; add white/light-gray zebra stripes per day while preserving running indicators and existing row actions (AR-043).
+
 - [x] Replace the app icon with a clear white stopwatch dial inspired by the old app, retaining the opaque edge-to-edge indigo background and all nine sizes; preserve the tray icon (AR-041).
 - [x] Start the timer on Enter in the timer description or Initial duration with a nonblank description; preserve suggestion-first Enter and duration validation (AR-042).
 

@@ -11,6 +11,8 @@
     <SolidColorBrush x:Key="HoverBrush" Color="#EEF0FF" />
     <SolidColorBrush x:Key="SelectedBrush" Color="#E0E7FF" />
     <SolidColorBrush x:Key="SelectedTextBrush" Color="#1E293B" />
+    <SolidColorBrush x:Key="AlternateRowBrush" Color="#F3F4F6" />
+    <SolidColorBrush x:Key="SelectedRowBrush" Color="#EDE9FE" />
     <SolidColorBrush x:Key="RunningBrush" Color="#FFF3CD" />
     <SolidColorBrush x:Key="RunningTextBrush" Color="#613C00" />
     <SolidColorBrush x:Key="RunningBorderBrush" Color="#A56300" />
