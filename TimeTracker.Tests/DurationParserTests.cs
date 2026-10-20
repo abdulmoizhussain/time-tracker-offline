@@ -6,6 +6,47 @@ namespace TimeTracker.Tests;
 public sealed class DurationParserTests
 {
     [Theory]
+    [InlineData("1h 2m 3s", 3723)]
+    [InlineData("1h 55m", 6900)]
+    [InlineData("59m 59s", 3599)]
+    [InlineData("90m", 5400)]
+    [InlineData("1000s", 1000)]
+    [InlineData("600s", 600)]
+    [InlineData("29", 1740)]
+    [InlineData(" 1H2M3S ", 3723)]
+    [InlineData("0h 0m 0s", 0)]
+    public void UnitAndClockPatternsParseWithoutChangingBareNumberMeaning(string input, int seconds)
+    {
+        Assert.True(DurationParser.TryParse(input, out var duration));
+        Assert.Equal(TimeSpan.FromSeconds(seconds), duration);
+        Assert.Equal(seconds == 0, !ManualEntryValidation.TryDuration(input, out _));
+        Assert.True(TimerInput.TryInitialDuration(input, out _));
+    }
+
+    [Theory]
+    [InlineData("1m 2")]
+    [InlineData("1h 123")]
+    [InlineData("-2s")]
+    [InlineData("2 2m")]
+    [InlineData("1h 90m")]
+    [InlineData("1m 60s")]
+    [InlineData("60m 1s")]
+    [InlineData("1h 1h")]
+    [InlineData("1s 1m")]
+    [InlineData("1.5h")]
+    [InlineData("1:02m")]
+    [InlineData("h")]
+    [InlineData("999999999999999999999999999999s")]
+    [InlineData("9223372036854775807h")]
+    public void UnitPatternRejectsIncompleteMixedOrOverflowingInput(string input)
+    {
+        Assert.False(DurationParser.TryParse(input, out var duration));
+        Assert.Equal(TimeSpan.Zero, duration);
+        Assert.False(ManualEntryValidation.TryDuration(input, out _));
+        Assert.False(TimerInput.TryInitialDuration(input, out _));
+    }
+
+    [Theory]
     [InlineData("30", 0, 30, 0)]
     [InlineData("90", 1, 30, 0)]
     [InlineData("0", 0, 0, 0)]

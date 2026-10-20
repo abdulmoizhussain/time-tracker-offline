@@ -246,8 +246,8 @@ public sealed class TimeEntryRepositoryTests : IDisposable
         Assert.InRange(entry.CreatedUtc, beforeAddUtc, afterAddUtc);
         Assert.Equal(DateTimeKind.Utc, entry.CreatedUtc.Kind);
         Assert.Equal(entry.CreatedUtc, entry.UpdatedUtc);
-        Assert.Equal(selectedDate.AddHours(21).AddMinutes(59).AddSeconds(59), entry.StartUtc!.Value.ToLocalTime());
-        Assert.Equal(selectedDate.AddHours(23).AddMinutes(59).AddSeconds(59), entry.EndUtc!.Value.ToLocalTime());
+        Assert.Equal(selectedDate.AddHours(21), entry.StartUtc!.Value.ToLocalTime());
+        Assert.Equal(selectedDate.AddHours(23), entry.EndUtc!.Value.ToLocalTime());
         Assert.Equal(7200, entry.DurationSeconds);
     }
 

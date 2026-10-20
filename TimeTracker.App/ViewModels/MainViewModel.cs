@@ -206,16 +206,16 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnIsEditModeChanged(bool value) => OnPropertyChanged(nameof(RangeButtonText));
 
     [ObservableProperty]
-    private string _manualDuration = "00:00:00";
+    private string _manualDuration = string.Empty;
 
     [ObservableProperty]
     private DateTime? _manualStartDate = DateTime.Today;
 
     [ObservableProperty]
-    private string _manualStartTime = "00:00:00";
+    private string _manualStartTime = string.Empty;
 
     [ObservableProperty]
-    private string _manualEndTime = "00:00:00";
+    private string _manualEndTime = string.Empty;
 
     [ObservableProperty]
     private string _runningElapsedText = "00:00:00";
@@ -488,8 +488,8 @@ public sealed partial class MainViewModel : ObservableObject
         ManualDuration = value.DurationText;
         ManualStartDate = value.GroupDate;
         RangeStartDate = value.GroupDate;
-        ManualStartTime = "00:00:00";
-        ManualEndTime = "00:00:00";
+        ManualStartTime = string.Empty;
+        ManualEndTime = string.Empty;
 
         if (value.StartUtc.HasValue)
         {
@@ -618,7 +618,7 @@ public sealed partial class MainViewModel : ObservableObject
         ManualDurationError = string.Empty;
         if (!ManualEntryValidation.TryDuration(ManualDuration, out var duration))
         {
-            ManualDurationError = "Enter a duration from 1 second to 23:59:59. Whole numbers mean minutes; decimals mean hours. Use minutes:seconds or hours:minutes:seconds (components 00–59).";
+            ManualDurationError = "Enter a duration from 1 second to 24:00:00. Whole numbers mean minutes; decimals mean hours. Use minutes:seconds, hours:minutes:seconds, or units such as 1h 2m 3s (multi-unit minutes/seconds 00–59).";
             return;
         }
         if (!ManualStartDate.HasValue)
@@ -634,12 +634,12 @@ public sealed partial class MainViewModel : ObservableObject
 
         var description = string.IsNullOrWhiteSpace(ManualDescription) ? DefaultTimerDescription : ManualDescription.Trim();
         var preferredTime = IsEditMode && SelectedEntry is not null
-            ? SelectedEntry.StartUtc?.ToLocalTime().TimeOfDay ?? DateTime.Now.TimeOfDay
+            ? SelectedEntry.EndUtc?.ToLocalTime().TimeOfDay ?? DateTime.Now.TimeOfDay
             : DateTime.Now.TimeOfDay;
         if (!ManualEntryValidation.TryDurationRange(ManualStartDate.Value, preferredTime, duration,
                 out var startLocal, out var endLocal))
         {
-            ManualDurationError = "Duration must fit on the selected day by 23:59:59 (maximum 23:59:59). Clock-change gaps or repeated hours are not supported.";
+            ManualDurationError = "Duration must be from 1 second to 24 hours. Clock-change gaps or repeated hours are not supported.";
             return;
         }
 
@@ -657,7 +657,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             await _repository.AddManualRangeEntryAsync(description, startLocal, endLocal).ConfigureAwait(true);
             ManualDescription = string.Empty;
-            ManualDuration = "00:00:00";
+            ManualDuration = string.Empty;
             ManualStartDate = DateTime.Today;
         }
 
@@ -717,8 +717,8 @@ public sealed partial class MainViewModel : ObservableObject
             await _repository.AddManualRangeEntryAsync(description, startLocal, endLocal).ConfigureAwait(true);
             RangeDescription = string.Empty;
             RangeStartDate = DateTime.Today;
-            ManualStartTime = "00:00:00";
-            ManualEndTime = "00:00:00";
+            ManualStartTime = string.Empty;
+            ManualEndTime = string.Empty;
         }
 
         await LoadEntriesAsync().ConfigureAwait(true);
@@ -1229,12 +1229,12 @@ public sealed partial class MainViewModel : ObservableObject
     private void ClearManualFields()
     {
         ManualDescription = string.Empty;
-        ManualDuration = "00:00:00";
+        ManualDuration = string.Empty;
         ManualStartDate = DateTime.Today;
         RangeDescription = string.Empty;
         RangeStartDate = DateTime.Today;
-        ManualStartTime = "00:00:00";
-        ManualEndTime = "00:00:00";
+        ManualStartTime = string.Empty;
+        ManualEndTime = string.Empty;
         ManualDurationError = string.Empty;
         ManualRangeError = string.Empty;
     }

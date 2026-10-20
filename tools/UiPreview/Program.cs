@@ -57,6 +57,7 @@ internal static class Program
         AssertTimerButtonAlignment(main, "StartTimerButton", "TimerDescriptionTextBox");
         AssertEntryAlignment(main);
         VerifyRowSelection(main, vm, output);
+        VerifyDurationInputs(main, vm);
         VerifyTimerEnter(main, vm);
         VerifyViewRestart(main, vm, repository, database, output);
         vm.TimerInitialDuration = "1.5";
@@ -164,6 +165,40 @@ internal static class Program
         Wait(vm.ResetEntryFiltersCommand.ExecuteAsync(null));
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
         Console.WriteLine("Row checks passed: zebra stripes, description click selects whole row, inactive selection, text copying, refresh restoration, filtered-out selection.");
+    }
+
+    private static void VerifyDurationInputs(MainWindow main, MainViewModel vm)
+    {
+        using var source = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Duration input checks"));
+        var manual = (TextBox)main.FindName("ManualDurationTextBox");
+        var timer = (TextBox)main.FindName("TimerInitialDurationTextBox");
+        if (vm.ManualDuration != "" || vm.ManualStartTime != "" || vm.ManualEndTime != "")
+            throw new InvalidOperationException("Manual time fields must start empty.");
+        foreach (var box in new[] { manual, timer })
+        {
+            foreach (var (input, expected) in new[] { ("1h 2m 3s", "01:02:03"), ("90m", "01:30:00"), ("1000s", "00:16:40"), ("29", "00:29:00") })
+            {
+                box.Text = input;
+                box.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+                box.RaiseEvent(new RoutedEventArgs(UIElement.LostFocusEvent));
+                if (box.Text != expected) throw new InvalidOperationException($"Focus-loss normalization failed for {input}.");
+            }
+            box.Text = "1m 2";
+            box.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+            box.RaiseEvent(new RoutedEventArgs(UIElement.LostFocusEvent));
+            if (box.Text != "1m 2" || string.IsNullOrEmpty(box == timer ? vm.TimerError : vm.ManualDurationError))
+                throw new InvalidOperationException("Malformed duration was changed or lacked feedback.");
+            box.Text = "600s";
+            box.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+            box.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+                source, Environment.TickCount, System.Windows.Input.Key.Enter)
+            { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent });
+            if (box.Text != "00:10:00" || vm.IsTimerRunning)
+                throw new InvalidOperationException("Enter normalization failed with a blank timer description.");
+        }
+        vm.ManualDuration = vm.TimerInitialDuration = string.Empty;
+        vm.TimerError = vm.ManualDurationError = string.Empty;
+        Console.WriteLine("Duration input checks passed: empty fields, focus-loss/Enter formatting, strict errors, clock fallback.");
     }
 
     private static void VerifyTimerEnter(MainWindow main, MainViewModel vm)

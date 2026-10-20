@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace TimeTracker.App.Helpers;
 
@@ -9,6 +10,7 @@ public static class DurationParser
         result = TimeSpan.Zero;
         if (string.IsNullOrWhiteSpace(input)) return false;
         var text = input.Trim();
+        if (text.Any(char.IsLetter)) return TryUnits(text, out result);
         if (text.Any(c => (c < '0' || c > '9') && c != ':' && c != '.' && c != ',')) return false;
         decimal seconds;
         try
@@ -60,5 +62,28 @@ public static class DurationParser
     {
         number = 0;
         return (allowEmpty && text.Length == 0) || long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out number);
+    }
+
+    private static bool TryUnits(string text, out TimeSpan result)
+    {
+        result = TimeSpan.Zero;
+        // Consume the complete input: no unlabeled numbers, repeated units, or reordered units.
+        var match = Regex.Match(text, @"\A(?:(?<h>[0-9]+)h\s*)?(?:(?<m>[0-9]+)m\s*)?(?:(?<s>[0-9]+)s)?\z",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!match.Success) return false;
+        var groups = new[] { match.Groups["h"], match.Groups["m"], match.Groups["s"] };
+        var count = groups.Count(g => g.Success);
+        if (count == 0) return false;
+        decimal seconds = 0;
+        var multipliers = new[] { 3600, 60, 1 };
+        for (var i = 0; i < groups.Length; i++)
+        {
+            if (!groups[i].Success) continue;
+            if (!TryNumber(groups[i].Value, out var value) || (count > 1 && i > 0 && value > 59)) return false;
+            seconds += (decimal)value * multipliers[i];
+        }
+        if (seconds > TimeSpan.MaxValue.Ticks / TimeSpan.TicksPerSecond) return false;
+        result = TimeSpan.FromTicks((long)seconds * TimeSpan.TicksPerSecond);
+        return true;
     }
 }

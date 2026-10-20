@@ -746,6 +746,40 @@ Relationship: refines AR-005/010/020's selection and running-row appearance. Exi
 
 Implementation notes (agent decisions): a single selected row uses light lavender, distinct from white/light-gray stripes restarting per day. Clicking description content selects the enclosing row without automatically selecting text or consuming the mouse event. Explicit text selection/copying remains available. Selection uses IsSelected independently of keyboard/window focus, overrides stripe/hover backgrounds, and retains the running row's amber border. Reloads restore selection by stable entry ID when present; deletion, filters, or week navigation removing the entry clear selection. No selection persistence across app restarts is introduced.
 
+## AR-044 — Unit durations, empty manual time fields, ending-now placement, and compact entries controls
+
+Recorded: 2026-10-21 (Asia/Karachi). Source: author messages in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- both the duration boxes should be able to accept these time patterns as well: `1h 2m 3s` || `1h 55m` || `59m 59s` || `90m` || `1000s` where h=hours, m=minutes and s=seconds.
+   - then whenever the user focuses out from the duration box, that pattern should get processed into this format `hh:mm:ss`.
+   - whenever only one unit is defined like `90m` || `600s` it should be converted properly into respective hours, minutes and seconds. but this should work ONLY when one unit is defined.
+   - this new pattern will only be taken into consideration when units are defined, otherwise the consideration will fall back to the normal `hh:mm:ss` pattern that we have already defined.
+   - this pattern should be accepted in both the duration boxes. whenever focus gets out either by clicking out of the box or by using the Tab key, or whenever pressing the Enter key. it should process the value of the box.
+   - document this in the Duration help / Usage content as well.
+   - do let me know if you see any flaw in this new feature that i am proposing.
+   - cases like incomplete formatted values will become invalid e.g. `1m 2`, `1h 123`, `-2s`, `2 2m`
+   - `29` this will fall back to previous time pattern.
+   - In the DurationHelp/Usage documentation we should label these 2 patterns too. so we can distinguish these 2 patterns in our conversations.
+- in the time boxes of the manual entries: duration box, start time box & end time box. there should only be placeholder values, instead of default values.
+- whenever entering a manual entry by duration, that entry is currently picking the Start Time starting from the current moment of adding that entry. Instead, the End Time of that entry should be ending at the current moment. I believe ending that entry's End Time at the current time will logically make sense too, because a person just worked on something that had happened previously, and that will not be happening in future. do let me know if you see any fault.
+- `Completed this week {total week time}` - this line should be kept beside the Entries heading, in the same row, like in brackets or may be with a simple separately, whatever seems better to you.
+- Reduce the height of the Older Week & Newer Week buttons to make some more vertical space.
+- Reduce the height of the horizontal scrollbar as well. just the horizontal. leave the width of the vertical bar as is.
+```
+
+Clarification context (agent question, summarized): asked how to handle a duration whose Start would fall before midnight, given the existing same-day rule.
+
+Author's clarification (verbatim):
+
+> in this case consider the Start Time from the beginning of the day, and let the End Time go wherever accordingly to the entered duration. but the rule of entering a duration not more that 24 hours will remain intact.
+
+Relationship: supersedes AR-020's start-at-current-time/end-of-day placement and its chosen 23:59:59 manual limit. Preserves AR-021's actual Created time and AR-042's timer Enter behavior. Initial timer duration retains its existing 23:59:59 limit.
+
+Implementation notes (agent decisions): name the input families **Clock pattern** and **Unit pattern**. Unit pattern requires whole numbers in h/m/s order, allows omitted units and optional spaces, and is case-insensitive. Reject duplicate/reordered units, decimal units, and unlabeled trailing/leading numbers. Only single-unit inputs may overflow; multi-unit minutes and seconds are 0–59. Normalize valid input on focus loss and Enter, retaining invalid text with inline feedback. Manual Enter formats only; Initial duration Enter retains starting with a nonblank description. Manual fields are empty initially/after adding/canceling, with noninteractive 00:00:00 hints. On the selected date, End uses the current clock time unless the duration exceeds time since midnight; then Start is midnight and End is midnight plus duration. Exactly 24 hours ends at the next midnight; longer values are rejected. Keep UTC storage, actual Created time, and clock-change validation. Weekly total is adjacent to Entries; navigation buttons use 26-unit minimum height and horizontal scrollbars 10-unit height under existing UI scaling; vertical scrollbar sizing stays native.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

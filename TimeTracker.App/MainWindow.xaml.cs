@@ -569,9 +569,38 @@ public partial class MainWindow : Window
         else if (e.Key == Key.Down && string.IsNullOrWhiteSpace(textBox.Text)) e.Handled = true;
     }
 
+    private void OnDurationLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.TextBox textBox) NormalizeDuration(textBox);
+    }
+
+    private void OnDurationPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || sender is not System.Windows.Controls.TextBox textBox) return;
+        NormalizeDuration(textBox);
+        e.Handled = true;
+    }
+
+    private void NormalizeDuration(System.Windows.Controls.TextBox textBox)
+    {
+        var isTimer = textBox == TimerInitialDurationTextBox;
+        var valid = isTimer
+            ? TimerInput.TryInitialDuration(textBox.Text, out var duration)
+            : ManualEntryValidation.TryDuration(textBox.Text, out duration);
+        var error = valid || string.IsNullOrWhiteSpace(textBox.Text) ? string.Empty
+            : $"Invalid duration. Use Clock pattern or Unit pattern (e.g. 1h 2m 3s); maximum {(isTimer ? "23:59:59" : "24:00:00")}.";
+        if (isTimer) ViewModel.TimerError = error;
+        else ViewModel.ManualDurationError = error;
+        if (!valid || string.IsNullOrWhiteSpace(textBox.Text)) return;
+        var formatted = DurationFormatter.Clock(duration.Ticks / TimeSpan.TicksPerSecond);
+        if (isTimer) ViewModel.TimerInitialDuration = formatted;
+        else ViewModel.ManualDuration = formatted;
+    }
+
     private void OnTimerStartPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
+        if (sender is System.Windows.Controls.TextBox textBox && textBox == TimerInitialDurationTextBox) NormalizeDuration(textBox);
         e.Handled = true;
         if (e.IsRepeat || ViewModel.IsTimerRunning || string.IsNullOrWhiteSpace(ViewModel.TimerDescription) ||
             !ViewModel.StartTimerCommand.CanExecute(null)) return;

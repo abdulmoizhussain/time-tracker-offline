@@ -6,6 +6,8 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Add labeled Clock/Unit duration patterns in both duration inputs with focus-loss/Enter normalization, strict unit validation and help; use empty manual time placeholders, end duration entries at the selected date's current clock time with midnight fallback and a 24-hour cap; place weekly total beside Entries and compact week buttons/horizontal scrollbars (AR-044).
+
 - [x] Add full-row single-click lavender selection, including clicks in descriptions, retained across focus changes and refreshes when visible; add white/light-gray zebra stripes per day while preserving running indicators and existing row actions (AR-043).
 
 - [x] Replace the app icon with a clear white stopwatch dial inspired by the old app, retaining the opaque edge-to-edge indigo background and all nine sizes; preserve the tray icon (AR-041).

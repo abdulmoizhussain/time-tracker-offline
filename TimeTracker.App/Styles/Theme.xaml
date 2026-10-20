@@ -101,6 +101,29 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <Style x:Key="TimePlaceholderStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+            <Border x:Name="Chrome" CornerRadius="6" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                <Grid>
+                    <ScrollViewer x:Name="PART_ContentHost" />
+                    <TextBlock x:Name="Placeholder" Text="{TemplateBinding Tag}" Margin="{TemplateBinding Padding}"
+                               VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}"
+                               IsHitTestVisible="False" Visibility="Collapsed" />
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="Text" Value=""><Setter TargetName="Placeholder" Property="Visibility" Value="Visible" /></Trigger>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55" /></Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ScrollBar">
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal"><Setter Property="Height" Value="10" /><Setter Property="MinHeight" Value="0" /></Trigger>
+        </Style.Triggers>
+    </Style>
     <Style TargetType="DatePicker">
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
         <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
