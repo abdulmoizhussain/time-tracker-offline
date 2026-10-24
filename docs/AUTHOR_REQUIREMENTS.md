@@ -780,6 +780,20 @@ Relationship: supersedes AR-020's start-at-current-time/end-of-day placement and
 
 Implementation notes (agent decisions): name the input families **Clock pattern** and **Unit pattern**. Unit pattern requires whole numbers in h/m/s order, allows omitted units and optional spaces, and is case-insensitive. Reject duplicate/reordered units, decimal units, and unlabeled trailing/leading numbers. Only single-unit inputs may overflow; multi-unit minutes and seconds are 0–59. Normalize valid input on focus loss and Enter, retaining invalid text with inline feedback. Manual Enter formats only; Initial duration Enter retains starting with a nonblank description. Manual fields are empty initially/after adding/canceling, with noninteractive 00:00:00 hints. On the selected date, End uses the current clock time unless the duration exceeds time since midnight; then Start is midnight and End is midnight plus duration. Exactly 24 hours ends at the next midnight; longer values are rejected. Keep UTC storage, actual Created time, and clock-change validation. Weekly total is adjacent to Entries; navigation buttons use 26-unit minimum height and horizontal scrollbars 10-unit height under existing UI scaling; vertical scrollbar sizing stays native.
 
+## AR-045 — Explicit manual range time formats and hints
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- in the manual entry by start & end time, the time formats requirements should be like: start & end should  require this format normally `HH:mm` & if someone provides the seconds then those can be acceptable like `HH:mm:ss` but if a value is providing like this `22:45`it should be considere HH:mm , not mm:ss. Make this required format `HH:mm` for both start and end time, in this manual entry. show placeholder as acordingly and also show in the on-hover hint of the title/value box as well -- Either HH:mm or HH:mm:ss. Give validation errors if someone only provides single number without any colon.
+```
+
+Relationship: refines AR-044's manual range placeholders and earlier time-input validation; duration input patterns remain unchanged.
+
+Implementation notes (agent decisions): enforce two ASCII digits for each hours/minutes/optional seconds component. Two components always mean hours/minutes; omitted seconds are zero. Keep hours 00–23, minutes/seconds 00–59, same-day ordering, and clock-change validation. Retain empty drafts, show HH:mm placeholders, and add format hints to both labels and both fields. Invalid inputs, including colonless numbers and partial components, produce the existing inline error when adding a range.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

@@ -45,7 +45,9 @@ public sealed class DurationValidationTests
 
     [Theory]
     [InlineData("00:00", true)]
-    [InlineData("9:30", true)]
+    [InlineData("09:30", true)]
+    [InlineData("22:45", true)]
+    [InlineData("22:45:30", true)]
     [InlineData("09:30:00", true)]
     [InlineData("23:59:59", true)]
     [InlineData("24:00", false)]
@@ -54,10 +56,26 @@ public sealed class DurationValidationTests
     [InlineData("10:00:60", false)]
     [InlineData("-1:30", false)]
     [InlineData("9", false)]
+    [InlineData("22", false)]
+    [InlineData("2245", false)]
+    [InlineData("9:30", false)]
+    [InlineData("09:3", false)]
+    [InlineData("09:30:0", false)]
+    [InlineData("22:", false)]
+    [InlineData(":45", false)]
     [InlineData("1.09:00:00", false)]
     [InlineData("999999999999:00", false)]
     public void TimeInputRequiresValidClockComponents(string input, bool expected)
         => Assert.Equal(expected, ManualEntryValidation.TryTime(input, out _));
+
+    [Theory]
+    [InlineData("22:45", 22, 45, 0)]
+    [InlineData("22:45:30", 22, 45, 30)]
+    public void RangeTimeUsesHoursAndMinutesWithOptionalSeconds(string input, int hours, int minutes, int seconds)
+    {
+        Assert.True(ManualEntryValidation.TryTime(input, out var time));
+        Assert.Equal(new TimeSpan(hours, minutes, seconds), time);
+    }
 
     [Theory]
     [InlineData(1199998800L, "333333:00:00")]

@@ -6,6 +6,8 @@ Original author statements and requirement history are maintained separately in 
 
 ## Completed Recently
 
+- [x] Require HH:mm or HH:mm:ss for manual Start/End times, interpret two parts as hours/minutes, reject colonless/partial input, and show HH:mm placeholders plus label/input hover hints (AR-045).
+
 - [x] Add labeled Clock/Unit duration patterns in both duration inputs with focus-loss/Enter normalization, strict unit validation and help; use empty manual time placeholders, end duration entries at the selected date's current clock time with midnight fallback and a 24-hour cap; place weekly total beside Entries and compact week buttons/horizontal scrollbars (AR-044).
 
 - [x] Add full-row single-click lavender selection, including clicks in descriptions, retained across focus changes and refreshes when visible; add white/light-gray zebra stripes per day while preserving running indicators and existing row actions (AR-043).

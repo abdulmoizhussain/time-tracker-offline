@@ -670,7 +670,7 @@ public sealed partial class MainViewModel : ObservableObject
         ManualRangeError = string.Empty;
         if (!ManualEntryValidation.TryTime(ManualStartTime, out var startTime) || !ManualEntryValidation.TryTime(ManualEndTime, out var endTime))
         {
-            ManualRangeError = "Use 24-hour H:mm or HH:mm:ss times: hours 00–23, minutes and seconds 00–59. Example: 09:30 or 09:30:00.";
+            ManualRangeError = "Start and End require either HH:mm or HH:mm:ss (24-hour time), with two digits per component: hours 00–23, minutes and seconds 00–59. Example: 22:45 means 22 hours, 45 minutes. A single number without a colon is invalid.";
             return;
         }
 

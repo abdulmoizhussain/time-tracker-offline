@@ -27,7 +27,7 @@ public static class ManualEntryValidation
         time = TimeSpan.Zero;
         if (string.IsNullOrWhiteSpace(input)) return false;
         var parts = input.Trim().Split(':');
-        if (parts.Length is not (2 or 3) || parts.Any(p => p.Length is < 1 or > 2 || p.Any(c => c < '0' || c > '9')))
+        if (parts.Length is not (2 or 3) || parts.Any(p => p.Length != 2 || p.Any(c => c < '0' || c > '9')))
             return false;
         if (!int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var hours) || hours > 23 ||
             !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes > 59)
