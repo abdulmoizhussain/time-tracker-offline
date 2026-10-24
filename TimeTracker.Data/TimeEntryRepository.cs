@@ -303,6 +303,29 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             .ConfigureAwait(false);
     }
 
+    public async Task<bool> UpdateCompletedEntryAsync(TimeEntry entry, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entry.Description);
+        const string sql = """
+            UPDATE TimeEntries
+            SET Description = @Description, StartUtc = @StartUtc, EndUtc = @EndUtc,
+                DurationSeconds = @DurationSeconds, UpdatedUtc = @UpdatedUtc
+            WHERE Id = @Id AND IsRunning = 0;
+            """;
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        var affected = await connection.ExecuteAsync(new CommandDefinition(sql, new
+        {
+            entry.Id,
+            Description = entry.Description.Trim(),
+            StartUtc = entry.StartUtc.HasValue ? ToUtcString(entry.StartUtc.Value) : null,
+            EndUtc = entry.EndUtc.HasValue ? ToUtcString(entry.EndUtc.Value) : null,
+            entry.DurationSeconds,
+            UpdatedUtc = ToUtcString(DateTime.UtcNow)
+        }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return affected != 0;
+    }
+
     public async Task<bool> UpdateEntryDescriptionAsync(int id, string description, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(description);

@@ -794,6 +794,42 @@ Relationship: refines AR-044's manual range placeholders and earlier time-input 
 
 Implementation notes (agent decisions): enforce two ASCII digits for each hours/minutes/optional seconds component. Two components always mean hours/minutes; omitted seconds are zero. Keep hours 00–23, minutes/seconds 00–59, same-day ordering, and clock-change validation. Retain empty drafts, show HH:mm placeholders, and add format hints to both labels and both fields. Invalid inputs, including colonless numbers and partial components, produce the existing inline error when adding a range.
 
+## AR-046 — Date and duration editing in Edit entry
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author messages and question replies in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- Extend the Edit entry popup to support duration/start date after the author specifies the workflow (AR-019).
+
+lets complete this one by providing only duration option and the date option for that entry. adjust the start time/end time only when the total duration entered goes beyond the current date. same 24hours a day validation will be applied. if the total duration does not affect time any cross-day time then leave the start time as is. let me know if there is any confusion?
+```
+
+Clarification context (agent questions, summarized): asked whether overflow should shift Start backward to End at midnight ending the selected date, allowing 24 hours midnight-to-midnight, and whether running entries must be stopped before editing Duration/Date.
+
+Author's answers (verbatim):
+
+> Yes, end at midnight and shift Start backward
+
+> Yes, stop the timer before changing Duration or Date (Recommended)
+
+Relationship: completes the deferred Date/Duration scope of AR-019. Keeps the Description editor and AR-021's Created rule. Edit placement differs from AR-044's new-entry ending-now/midnight-start fallback.
+
+Implementation notes (agent decisions): completed entries show prefilled Date and Duration alongside Description; no direct Start/End editors. Date moves the original Start clock time to the selected day. Duration uses existing Clock/Unit parsing and normalization; timing changes require 1 second to 24 hours. Recalculate End from Start plus duration when it fits; otherwise shift Start backward to End at the next midnight. Description-only saves preserve original timing exactly, including large and undated historical records. For records without Start, timing edits anchor to midnight with an explicit hint. Running timing fields stay disabled; atomic completed-entry updates reject deleted/running targets and preserve Created. Keep clock-change validation, refresh current filters/sort/week without altering manual drafts, preserve blank-description Save disabling, and keep errors in the popup for retry.
+
+## AR-047 — Matching-description search in Edit entry
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> the edit entry window's description box should also have the search matching entries feature.
+
+Relationship: extends AR-019/046's Edit entry description field with the suggestion behavior used by the main window's description fields (AR-022/025).
+
+Implementation notes (agent decisions): search existing descriptions from the first nonblank typed character, trimming outer query spaces and using the same repository search with eight results. Keep focus in Description; Up/Down chooses a result, Enter or mouse click fills the draft without saving, and Escape dismisses suggestions before normal dialog cancellation. Empty-field Down-arrow shows the last five entries by Created, preserving duplicates. Accepting a result does not modify timing or save. Suppress stale results after newer input, selection, focus loss, saving, or closing; optional search failures do not block editing. Applies to running and completed entries.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

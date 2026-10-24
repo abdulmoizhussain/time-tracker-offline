@@ -300,6 +300,16 @@ public sealed class EntryPaginationTests : IDisposable
                     Assert.Equal("Keep this draft", vm.ManualDescription);
                     await vm.SaveEntryDescriptionAsync(completedRow.Id, "Renamed completed task");
                     Assert.Equal("Running: Renamed running timer", vm.RunningStatusText);
+                    var editDate = currentMonday.AddDays(1);
+                    await vm.SaveEntryEditAsync(completedRow.ToModel(), new("Edited timing",
+                        editDate.AddHours(22), editDate.AddDays(1), 7200));
+                    var edited = (await _repository.GetRecentEntriesAsync(10)).Single(e => e.Id == completedRow.Id);
+                    Assert.Equal(completedRow.CreatedUtc, edited.CreatedUtc);
+                    Assert.Equal(editDate.AddHours(22), edited.StartUtc!.Value.ToLocalTime());
+                    Assert.Equal(editDate.AddDays(1), edited.EndUtc!.Value.ToLocalTime());
+                    Assert.Equal(7200, edited.DurationSeconds);
+                    Assert.Equal("Edited timing", vm.Entries.Single(e => e.Id == completedRow.Id).Description);
+                    Assert.Equal("Keep this draft", vm.ManualDescription);
                     await vm.StopEntryCommand.ExecuteAsync(runningRow);
                     Assert.False(vm.IsTimerRunning);
                     Assert.Equal("Time Tracker", vm.WindowTitle);

@@ -280,6 +280,37 @@ public sealed class TimeEntryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CompletedTimingUpdatePreservesCreatedAndRejectsRunningOrDeletedEntries()
+    {
+        var date = DateTime.Today.AddDays(-1);
+        var id = await _repository.AddManualRangeEntryAsync("Original", date.AddHours(10), date.AddHours(11));
+        var entry = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        var created = entry.CreatedUtc;
+        entry.Description = "Edited";
+        entry.StartUtc = date.AddHours(22).ToUniversalTime();
+        entry.EndUtc = date.AddDays(1).ToUniversalTime();
+        entry.DurationSeconds = 7200;
+        var before = DateTime.UtcNow;
+        Assert.True(await _repository.UpdateCompletedEntryAsync(entry));
+        var updated = Assert.Single(await _repository.GetRecentEntriesAsync(10));
+        Assert.Equal(created, updated.CreatedUtc);
+        Assert.InRange(updated.UpdatedUtc, before, DateTime.UtcNow);
+        Assert.Equal(entry.StartUtc, updated.StartUtc);
+        Assert.Equal(entry.EndUtc, updated.EndUtc);
+        Assert.Equal(7200, updated.DurationSeconds);
+        Assert.Equal("Edited", updated.Description);
+        await _repository.DeleteEntryAsync(id);
+        Assert.False(await _repository.UpdateCompletedEntryAsync(entry));
+
+        var runningId = await _repository.StartTimerAsync("Running", DateTime.UtcNow.AddHours(-1));
+        entry.Id = runningId;
+        Assert.False(await _repository.UpdateCompletedEntryAsync(entry));
+        var running = (await _repository.GetRunningEntryAsync())!;
+        Assert.Equal("Running", running.Description);
+        Assert.Null(running.EndUtc);
+    }
+
+    [Fact]
     public async Task DeleteEntryAsync_RemovesEntry()
     {
         var id = await _repository.AddDurationEntryAsync("To delete", TimeSpan.FromMinutes(10));

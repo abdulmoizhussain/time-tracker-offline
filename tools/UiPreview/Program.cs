@@ -87,9 +87,10 @@ internal static class Program
         vm.IsFiltersExpanded = false;
         Render(new TrayPopupWindow(main), 340, 240, Path.Combine(output, "tray-running.png"));
         Render(new UsageWindow(), 660, 610, Path.Combine(output, "usage.png"));
-        Render(new EditEntryWindow(new EditEntryViewModel("Review the weekly plan", false, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-entry.png"));
-        Render(new EditEntryWindow(new EditEntryViewModel("Running task", true, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-running-entry.png"));
-        Render(new EditEntryWindow(new EditEntryViewModel("   ", false, _ => Task.CompletedTask)), 560, 290, Path.Combine(output, "edit-entry-blank.png"));
+        Render(new EditEntryWindow(new EditEntryViewModel(new TimeEntry { Description = "Review the weekly plan", IsRunning = false, StartUtc = DateTime.Today.AddHours(10).ToUniversalTime(), EndUtc = DateTime.Today.AddHours(11).ToUniversalTime(), DurationSeconds = 3600 }, _ => Task.CompletedTask)), 600, 420, Path.Combine(output, "edit-entry.png"));
+        Render(new EditEntryWindow(new EditEntryViewModel(new TimeEntry { Description = "Running task", IsRunning = true, StartUtc = DateTime.Today.AddHours(10).ToUniversalTime(), EndUtc = DateTime.Today.AddHours(11).ToUniversalTime(), DurationSeconds = 3600 }, _ => Task.CompletedTask)), 600, 420, Path.Combine(output, "edit-running-entry.png"));
+        Render(new EditEntryWindow(new EditEntryViewModel(new TimeEntry { Description = "   ", IsRunning = false, StartUtc = DateTime.Today.AddHours(10).ToUniversalTime(), EndUtc = DateTime.Today.AddHours(11).ToUniversalTime(), DurationSeconds = 3600 }, _ => Task.CompletedTask)), 600, 420, Path.Combine(output, "edit-entry-blank.png"));
+        VerifyEditSuggestions(repository, output);
         Render(new UnfinishedTimerWindow("Review the weekly plan", new(1, TimeTracker.Core.Models.TimerInterruptionReason.Lock, DateTime.UtcNow)), 580, 400, Path.Combine(output, "unfinished-lock.png"));
         Render(new UnfinishedTimerWindow("After an abrupt shutdown", new(1, TimeTracker.Core.Models.TimerInterruptionReason.LastSeen, DateTime.UtcNow)), 580, 400, Path.Combine(output, "unfinished-activity.png"));
         Render(new UnfinishedTimerWindow("Legacy running entry", new(1, TimeTracker.Core.Models.TimerInterruptionReason.Unknown, null)), 580, 400, Path.Combine(output, "unfinished-unknown.png"));
@@ -165,6 +166,72 @@ internal static class Program
         Wait(vm.ResetEntryFiltersCommand.ExecuteAsync(null));
         Render(main, 1100, 760, Path.Combine(output, "main-idle.png"));
         Console.WriteLine("Row checks passed: zebra stripes, description click selects whole row, inactive selection, text copying, refresh restoration, filtered-out selection.");
+    }
+
+    private static void VerifyEditSuggestions(TimeEntryRepository repository, string output)
+    {
+        Wait(repository.AddDurationEntryAsync("Edit suggestion alpha", TimeSpan.FromMinutes(15), DateTime.Today));
+        Wait(repository.AddDurationEntryAsync("Edit suggestion beta", TimeSpan.FromMinutes(15), DateTime.Today));
+        var saved = false;
+        var vm = new EditEntryViewModel(new TimeEntry
+        {
+            Description = "Editor original", StartUtc = DateTime.Today.AddHours(10).ToUniversalTime(), DurationSeconds = 3600
+        }, _ => { saved = true; return Task.CompletedTask; },
+            query => repository.SearchDescriptionsAsync(query, 8),
+            async () => (await repository.GetRecentEntriesAsync(5)).Select(e => e.Description).ToList());
+        var dialog = new EditEntryWindow(vm);
+        Render(dialog, 600, 420, Path.Combine(output, "edit-entry-search.png"));
+        // Popup.IsOpen is coerced false without a loaded presentation source.
+        // Host this test window off-screen without activation or a taskbar button.
+        dialog.WindowStartupLocation = WindowStartupLocation.Manual;
+        dialog.Left = dialog.Top = -10000;
+        dialog.ShowActivated = false;
+        dialog.ShowInTaskbar = false;
+        dialog.Show();
+        var box = (TextBox)dialog.FindName("DescriptionTextBox");
+        var list = (ListBox)dialog.FindName("SuggestionsListBox");
+        using var source = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("Edit suggestion checks"));
+        void Type(string text)
+        {
+            box.Text = text;
+            box.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+            Wait(vm.SuggestionLoading);
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        }
+        System.Windows.Input.KeyEventArgs Key(System.Windows.Input.Key key, bool up = false)
+        {
+            var e = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, source, Environment.TickCount, key)
+            { RoutedEvent = up ? System.Windows.Input.Keyboard.PreviewKeyUpEvent : System.Windows.Input.Keyboard.PreviewKeyDownEvent };
+            box.RaiseEvent(e);
+            return e;
+        }
+        Type("Edit suggestion");
+        if (!vm.IsSuggestionsOpen || vm.Suggestions.Count < 2 ||
+            !((System.Windows.Controls.Primitives.Popup)dialog.FindName("SuggestionsPopup")).IsOpen)
+            throw new InvalidOperationException($"Edit entry typing did not open matching suggestions: open={vm.IsSuggestionsOpen}, count={vm.Suggestions.Count}, popup={((System.Windows.Controls.Primitives.Popup)dialog.FindName("SuggestionsPopup")).IsOpen}, text={vm.Description}.");
+        Key(System.Windows.Input.Key.Down);
+        var expected = vm.Suggestions[vm.SuggestionIndex];
+        if (!Key(System.Windows.Input.Key.Enter).Handled || vm.Description != expected || saved || vm.IsSuggestionsOpen)
+            throw new InvalidOperationException("Edit suggestion Enter saved or failed to fill the draft.");
+        Type("Edit suggestion");
+        if (!Key(System.Windows.Input.Key.Escape).Handled || vm.IsSuggestionsOpen)
+            throw new InvalidOperationException("Edit suggestion Escape did not dismiss the list.");
+        Type("");
+        Key(System.Windows.Input.Key.Down);
+        Key(System.Windows.Input.Key.Down, up: true);
+        Wait(vm.SuggestionLoading);
+        if (!vm.IsSuggestionsOpen || vm.Suggestions.Count != 5)
+            throw new InvalidOperationException("Edit empty Down-arrow did not show five recent entries.");
+        Type("Edit suggestion");
+        list.UpdateLayout();
+        var item = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+        item.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        { RoutedEvent = System.Windows.Input.Mouse.PreviewMouseDownEvent });
+        if (vm.Description != (string)item.DataContext || vm.IsSuggestionsOpen || saved)
+            throw new InvalidOperationException("Clicking an edit suggestion failed to fill only the draft.");
+        dialog.Close();
+        Console.WriteLine("Edit suggestion checks passed: automatic matching, popup binding, navigation, Enter without save, Escape, recents, mouse selection.");
     }
 
     private static void VerifyDurationInputs(MainWindow main, MainViewModel vm)

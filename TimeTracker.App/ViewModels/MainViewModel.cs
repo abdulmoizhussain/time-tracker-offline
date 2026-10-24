@@ -732,13 +732,41 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        var dialog = new EditEntryWindow(new EditEntryViewModel(entry.Description, entry.IsRunning,
-            description => SaveEntryDescriptionAsync(entry.Id, description)));
+        var original = entry.ToModel();
+        var dialog = new EditEntryWindow(new EditEntryViewModel(original,
+            changes => SaveEntryEditAsync(original, changes),
+            query => _repository.SearchDescriptionsAsync(query, 8),
+            async () => (await _repository.GetRecentEntriesAsync(5)).Select(e => e.Description).ToList()));
         if (System.Windows.Application.Current.MainWindow is { IsVisible: true } owner)
         {
             dialog.Owner = owner;
         }
         dialog.ShowDialog();
+    }
+
+    public async Task SaveEntryEditAsync(TimeEntry original, EditEntryChanges changes)
+    {
+        if (changes.DurationSeconds is null)
+        {
+            await SaveEntryDescriptionAsync(original.Id, changes.Description);
+            return;
+        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(changes.Description);
+        if (original.IsRunning || changes.StartLocal is not { } start || changes.EndLocal is not { } end ||
+            changes.DurationSeconds is < 1 or > 86400 ||
+            !ManualEntryValidation.TryEditedDurationRange(start.Date, start.TimeOfDay,
+                TimeSpan.FromSeconds(changes.DurationSeconds.Value), out var checkedStart, out var checkedEnd) ||
+            checkedStart != start || checkedEnd != end)
+            throw new InvalidOperationException("Stop running timers before editing timing; use a valid date and duration of 1 second to 24 hours.");
+        var updated = new TimeEntry
+        {
+            Id = original.Id, Description = changes.Description.Trim(),
+            StartUtc = start.ToUniversalTime(), EndUtc = end.ToUniversalTime(),
+            DurationSeconds = changes.DurationSeconds.Value
+        };
+        if (!await _repository.UpdateCompletedEntryAsync(updated))
+            throw new InvalidOperationException("This entry no longer exists or is running. Close this window and refresh the list.");
+        await LoadEntriesAsync();
     }
 
     public async Task SaveEntryDescriptionAsync(int id, string description)
