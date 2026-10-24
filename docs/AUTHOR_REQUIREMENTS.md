@@ -830,6 +830,65 @@ Relationship: extends AR-019/046's Edit entry description field with the suggest
 
 Implementation notes (agent decisions): search existing descriptions from the first nonblank typed character, trimming outer query spaces and using the same repository search with eight results. Keep focus in Description; Up/Down chooses a result, Enter or mouse click fills the draft without saving, and Escape dismisses suggestions before normal dialog cancellation. Empty-field Down-arrow shows the last five entries by Created, preserving duplicates. Accepting a result does not modify timing or save. Suppress stale results after newer input, selection, focus loss, saving, or closing; optional search failures do not block editing. Applies to running and completed entries.
 
+## AR-048 — Separate Jira upload window, connection settings, logs, and failed entries
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author message and supplied `toggle-to-jira.js` / `logger.js` in the current development conversation.
+
+Author's original request (verbatim; the attached-file listing is omitted):
+
+```text
+ok lets build that feature now. we will create a separate window for this,
+
+- the script i will provide to you, is able to upload the time entries to each entry's JIRA ticket.
+- how it picks the each time entry's jira ticket? --> it uses a regex pattern like `[a-zA-Z]{1,}\-[0-9]{1,}`  -- you will see the exact pattern inside the script. and by using this pattern the script picks the jira ticket ID. considers that Jira ID, puts that Jira ID into the provided organization's URL part and starts to upload the entries with a JSON file which contains all the entries.
+- what we will be doing in the UI is that we will ask every time a date range from the user for which date range entries to upload.
+- we will maintain a history of last uploaded entries as well, in a separate table. so that users will remember till what last date they uploaded the time entries.
+- the script required JIRA token, user's email, and the organization's domain. -- we can ask the user these 3 things when they are uploading the time entries for the first time and put them in the same DB for future use.
+- you will observe some logging pattern in the script, you have to use the same kind of logging pattern in this desktop application as well. but use the logging directory to be the same as of the database directory.
+- we will have to keep the failed entries in the memory so we can tell them to the user after the uploading is complete, so that user can copy those entries (their date and duration too) for uploading them manually.
+
+
+
+i have attached the script, read it and let me know if there are any questions.
+```
+
+Context (agent observations): the script uses the first `([A-Za-z]+-\d+)` match, Basic email/token authentication, Jira Cloud REST v3 ADF worklog comments, UTC started timestamps, sequential requests with a 500 ms pause, and skips durations below 60 seconds. Logger output uses daily files and `timestamp worker [level]: message`. The script's TLS-verification bypass and configuration logging are not requirements to copy.
+
+Implementation notes (agent decisions): native asynchronous C# upload, no Node.js dependency or manual export file; required inclusive local dates independent of list filtering, review count/duration before upload, normal TLS validation, encrypted token using Windows current-user protection, and daily log files directly beside the database with credential redaction. Use existing export eligibility (completed entries) and effective-date selection; missing Start falls back to End/Created. Keep batch history separate with requested range, account, counts, outcome, and successful entry date bounds. Persist progress after each result; keep incomplete batches identifiable after interruption. Stop finishes the current request; failures/not-attempted entries are copyable in memory until the next upload or window closure. No automatic retries. AR-049 supplies the author's duplicate-handling and token-update decisions.
+
+## AR-049 — Simple uploads, separate history, and replaceable saved token
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author correction in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+- ignore both of these 2 points, just implement a simple upload to Jira feature as you have planned above. no extra complexity. let the users themselves worry about if they uploaded twice or not. we just need to show them the history of last uploaded.
+- maintain the history in a separate table. don't make any changes to the current time entries table.
+- if you are encrypting the JIRA token before saving, then we should have an option to update the token as well -- in the case of token gets expired/revoked and require an update.
+```
+
+Context (not an author quote): the two agent questions concerned skipping already uploaded entries and updating or reviewing worklogs after local edits. This correction rejects both proposals.
+
+Relationship: refines AR-048. Duplicate prevention, uploaded-entry reconciliation, and remote worklog updates are out of scope. Each selected completed entry may be uploaded again at the user's discretion.
+
+Implementation notes (agent decisions): add only `JiraSettings` and `JiraUploadHistory` in schema v4; leave the `TimeEntries` schema/data untouched. Connection settings stay editable, with a blank password box retaining the saved encrypted token and a new value replacing it on Save. Never store the token in upload history or logs.
+
+## AR-050 — Use the first Jira ticket ID from the left
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author clarification in the current development conversation.
+
+Author's original request (verbatim):
+
+```text
+one thing to validate,
+we need to search for the ticket ID pattern from the left side of the description, and we have to pick the very first ID from it. bcoz there can be possiblity of having multiple IDs in a single description text.
+```
+
+Relationship: clarifies AR-048/049's ticket selection when a description contains multiple IDs.
+
+Validation notes (agent observations): the existing `Regex.Match` searches left to right and returns the first match. The existing request test checks that `abc-123 review XYZ-999` produces exactly one request to `abc-123`, with the entire description preserved as the comment. No upload behavior change is needed; README now states the search direction explicitly.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

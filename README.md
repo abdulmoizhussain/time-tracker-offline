@@ -201,6 +201,15 @@ The app follows a layered MVVM architecture:
 - JSON-based import/export.
 - History of every import/export action is recorded and viewable.
 
+### Upload to Jira
+- Open **Import/Export → Upload to Jira...**. Enter your Jira organization domain (for example `company.atlassian.net`), account email, and API token. **Save connection settings** stores them in the same database; the token is encrypted with Windows protection for the current Windows user. To replace an expired/revoked token, enter the new token in Connection settings and save. A blank token field keeps the saved token. Moving the database to a different Windows user/computer may require entering a replacement token.
+- Choose **both From and To dates** each time you open the window, then **Review entries** to see the count and total duration. Dates are inclusive local calendar dates, using Start, then End/Created when Start is absent. Current list filters and pagination do not affect the upload. Running entries are excluded. Changing dates requires another review.
+- **Upload to Jira** creates worklogs directly through the [Jira Cloud REST v3 worklog API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-worklogs/), without Node.js or an intermediate export file. As in the supplied script, it searches the description from left to right using `([A-Za-z]+-\d+)` and uses only the first matching ticket ID, even when several IDs occur. The full description becomes the comment, and the start timestamp is sent in UTC. Entries below one minute or without a ticket ID appear as failures. Requests run sequentially with a 500 ms delay, retain normal HTTPS certificate validation, and are never automatically retried.
+- There is **no duplicate detection or worklog updating**: uploading the same entries again creates additional worklogs. Earlier uploads through the standalone script are not included in this app's history.
+- **Upload history** is stored in a separate `JiraUploadHistory` table: account/domain, requested range, upload time, status, successful/failed/not-attempted counts, and the latest successfully uploaded entry date. Partial success does not mean the whole range was uploaded. History survives time-entry deletion; the uploader never changes `TimeEntries`. Incomplete batches remain visible if completion could not be recorded.
+- **Stop after current entry** lets the current request finish and lists the remaining entries as not uploaded. Failed/not-attempted entries remain in memory until the next upload or the window closes. Use **Copy failed entries**, or select text directly, to copy their descriptions, local dates/times, durations, and reasons for manual work logging. Network timeouts can have an unknown outcome; the failure text reminds you to check Jira before retrying.
+- Daily logs are written **directly in the database directory**, as `yyyy-MM-dd.log`, using `yyyy-MM-dd HH:mm:ss.fff worker [info|warn|error]: message`, including processing and failure summaries. Tokens and authorization values are excluded. The window shows the directory path. These files include entry descriptions and are retained until you remove them.
+
 ### Screen Lock / Unlock History
 - Records Windows session lock/unlock events while the app is running.
 - Separate screen to review these events.
@@ -327,11 +336,13 @@ dotnet publish .\TimeTracker.App\TimeTracker.App.csproj -c Release -r win-x64 --
 
 ## Database Schema & Versioning
 
-The database uses `PRAGMA user_version` for migrations. Current version is **3**.
+The database uses `PRAGMA user_version` for migrations. Current version is **4**.
 
 ### Tables
 
 `TimerInterruptions` (schema v3) stores each running entry's latest recovery reason and UTC timestamp, with a cascading reference to `TimeEntries`. Saving a checkpoint does not change the entry's Created/Modified timestamps.
+
+Schema v4 adds `JiraSettings` (one saved domain/email/encrypted token) and `JiraUploadHistory` (batch summaries and UTC timestamps), without altering `TimeEntries` or adding upload flags to entries.
 
 #### `TimeEntries`
 | Column | Type | Notes |

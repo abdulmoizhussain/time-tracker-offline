@@ -100,6 +100,7 @@ internal static class Program
         exportVm.FromDate = DateTime.Today.AddDays(-7);
         exportVm.ToDate = DateTime.Today;
         Render(exportOptions, 520, 400, Path.Combine(output, "export-options.png"));
+        VerifyJiraUploadPreview(repository, database, output);
         Render(new ConfirmWindow("Remove entry?", "Remove 'Review the weekly plan'? This entry will be deleted from your local database.", "Remove entry"), 480, 230, Path.Combine(output, "confirmation.png"));
         vm.FilterDescription = "no match";
         Wait(vm.ApplyEntryFiltersCommand.ExecuteAsync(null));
@@ -122,13 +123,46 @@ internal static class Program
             foreach (var error in diagnostics.Errors.Distinct()) Console.Error.WriteLine(error);
             throw new InvalidOperationException("WPF binding errors detected during preview.");
         }
-        Console.WriteLine($"Rendered eighteen previews to {output}; no WPF binding errors.");
+        Console.WriteLine($"Rendered UI previews to {output}; no WPF binding errors.");
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(database);
         File.Delete(database + "-wal");
         File.Delete(database + "-shm");
         File.Delete(database + ".view.json");
         File.Delete(database + ".view.json.tmp");
+    }
+
+    private static void VerifyJiraUploadPreview(TimeEntryRepository entries, string database, string output)
+    {
+        using var http = new System.Net.Http.HttpClient(); // Rendering never sends requests.
+        var vm = new JiraUploadViewModel(entries, new JiraUploadRepository(new SqliteConnectionFactory(database)),
+            new TimeTracker.App.Services.JiraWorklogClient(http), new TimeTracker.App.Services.JiraUploadLog(database))
+        {
+            Domain = "example.atlassian.net", Email = "user@example.com", FromDate = DateTime.Today.AddDays(-7), ToDate = DateTime.Today,
+            IsConnectionExpanded = false,
+            LastUploadText = "Last upload with successes: 25-Oct-2026 10:00 · example.atlassian.net · latest entry date: 2026-10-24.",
+            FailedEntriesText = "Description: ABC-123 Review work\nStart Date: 2026-10-24\nStart Time: 09:00:00\nDuration: 01:30:00\nReason: API error: 403 Forbidden."
+        };
+        Wait(vm.ReviewCommand.ExecuteAsync(null));
+        vm.History.Add(new(new JiraUploadHistory
+        {
+            Domain = "example.atlassian.net", Email = "user@example.com", FromUtc = DateTime.Today.AddDays(-7).ToUniversalTime(),
+            ToUtcExclusive = DateTime.Today.AddDays(1).ToUniversalTime(), StartedUtc = DateTime.UtcNow, CompletedUtc = DateTime.UtcNow,
+            TotalCount = 4, SuccessCount = 3, FailedCount = 1, Status = "Completed with failures", LastUploadedStartUtc = DateTime.Today.AddHours(9).ToUniversalTime()
+        }));
+        var window = new JiraUploadWindow(vm);
+        Render(window, 1000, 820, Path.Combine(output, "jira-upload.png"));
+        vm.IsConnectionExpanded = true;
+        Render(window, 1000, 820, Path.Combine(output, "jira-upload-settings.png"));
+        var tokenBox = (PasswordBox)window.FindName("TokenBox");
+        tokenBox.Password = "preview-token";
+        if (vm.TokenDraft != "preview-token") throw new InvalidOperationException("Jira token input did not update its draft.");
+        vm.TokenDraft = string.Empty;
+        if (tokenBox.Password.Length != 0) throw new InvalidOperationException("Jira token field did not clear after saving.");
+        Render(window, 650, 500, Path.Combine(output, "jira-upload-small.png"));
+        Application.Current.Resources["UiScaleMultiplier"] = 1.5d;
+        Render(window, 1000, 820, Path.Combine(output, "jira-upload-scaled.png"));
+        Application.Current.Resources["UiScaleMultiplier"] = 1d;
     }
 
     private static void VerifyRowSelection(MainWindow main, MainViewModel vm, string output)

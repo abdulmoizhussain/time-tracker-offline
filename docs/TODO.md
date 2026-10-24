@@ -128,6 +128,8 @@ dotnet publish .\TimeTracker.App\TimeTracker.App.csproj -c Release -r win-x64 --
 
 ## Completed TODOs
 
+- [x] Add a separate Jira upload window with required date ranges, editable saved connection/token settings, script-compatible ticket matching/worklog requests, daily logs beside the database, copyable in-memory failures, and separate upload history without changing `TimeEntries` or adding duplicate checks (AR-048/049).
+
 ### Completed work
 
 - [x] Add matching-description suggestions to Edit entry for running/completed entries, including typing search, click/keyboard acceptance without saving, empty-field recent entries, and stale-result protection (AR-047).

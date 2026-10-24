@@ -27,7 +27,7 @@ public sealed class TimeEntryRepositoryTests : IDisposable
     public async Task InitializeAsync_CreatesSchema()
     {
         var version = await _repository.GetDatabaseVersionAsync();
-        Assert.Equal(3, version);
+        Assert.Equal(4, version);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class TimeEntryRepositoryTests : IDisposable
         }
         await _repository.InitializeAsync();
         await _repository.InitializeAsync();
-        Assert.Equal(3, await _repository.GetDatabaseVersionAsync());
+        Assert.Equal(4, await _repository.GetDatabaseVersionAsync());
         var after = (await _repository.GetRunningEntryAsync())!;
         Assert.Equal(before.StartUtc, after.StartUtc);
         Assert.Equal(before.CreatedUtc, after.CreatedUtc);

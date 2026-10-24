@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using TimeTracker.App.ViewModels;
 using TimeTracker.App.Helpers;
 using TimeTracker.Core.Models;
@@ -358,6 +359,13 @@ public partial class MainWindow : Window
         {
             vm.RefreshCommand.Execute(null);
         }
+    }
+
+    private void OnJiraUploadClick(object sender, RoutedEventArgs e)
+    {
+        var window = App.Services.GetRequiredService<JiraUploadWindow>();
+        window.Owner = this;
+        window.ShowDialog();
     }
 
     private void OnUsageClick(object sender, RoutedEventArgs e)

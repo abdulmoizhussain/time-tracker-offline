@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using TimeTracker.App.ViewModels;
 using TimeTracker.App.Helpers;
+using TimeTracker.App.Services;
 using TimeTracker.Core.Configuration;
 using TimeTracker.Core.Contracts;
 using TimeTracker.Data;
@@ -133,6 +134,15 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<TimeEntryRepository>();
                 services.AddSingleton<ITimeEntryRepository>(provider => provider.GetRequiredService<TimeEntryRepository>());
                 services.AddSingleton<IScreenSessionEventRepository>(provider => provider.GetRequiredService<TimeEntryRepository>());
+                services.AddSingleton<IJiraUploadRepository, JiraUploadRepository>();
+                services.AddSingleton(new JiraUploadLog(databasePath));
+                services.AddSingleton(_ => new System.Net.Http.HttpClient(new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
+                {
+                    Timeout = TimeSpan.FromSeconds(60)
+                });
+                services.AddSingleton<JiraWorklogClient>();
+                services.AddTransient<JiraUploadViewModel>();
+                services.AddTransient<JiraUploadWindow>();
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<ScreenEventsViewModel>();
                 services.AddSingleton<ImportExportHistoryViewModel>();

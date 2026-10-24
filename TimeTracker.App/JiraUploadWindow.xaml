@@ -1,0 +1,93 @@
+<Window x:Class="TimeTracker.App.JiraUploadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Upload to Jira" Width="1000" Height="820" MinWidth="650" MinHeight="500"
+        WindowStartupLocation="CenterOwner" Style="{StaticResource ScaledWindowStyle}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16">
+            <TextBlock Text="Upload to Jira" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,6" />
+            <TextBlock Text="{Binding LastUploadText}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <Border Style="{StaticResource SurfaceStyle}">
+                <Expander Header="Connection settings · save or replace your token" IsExpanded="{Binding IsConnectionExpanded}" IsEnabled="{Binding CanEdit}">
+                    <StackPanel Margin="0,10,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Organization domain" />
+                                <TextBox Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}" ToolTip="company.atlassian.net or https://company.atlassian.net" AutomationProperties.AutomationId="JiraDomain" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Jira account email" />
+                                <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="JiraEmail" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="API token / replacement token" Margin="0,8,0,0" />
+                        <PasswordBox x:Name="TokenBox" PasswordChanged="OnTokenChanged" Padding="8,2" MinHeight="28"
+                                     AutomationProperties.AutomationId="JiraToken" />
+                        <TextBlock Text="{Binding TokenHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,8" />
+                        <Button Content="Save connection settings" Command="{Binding SaveSettingsCommand}" HorizontalAlignment="Left"
+                                AutomationProperties.AutomationId="JiraSaveSettings" />
+                    </StackPanel>
+                </Expander>
+            </Border>
+            <Border Style="{StaticResource SurfaceStyle}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="Entries to upload" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <Grid IsEnabled="{Binding CanEdit}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Text="From date (required)" />
+                            <DatePicker x:Name="FromPicker" SelectedDate="{Binding FromDate}" DateValidationError="OnDateValidationError"
+                                        AutomationProperties.AutomationId="JiraFromDate" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Text="To date (required)" />
+                            <DatePicker x:Name="ToPicker" SelectedDate="{Binding ToDate}" DateValidationError="OnDateValidationError"
+                                        AutomationProperties.AutomationId="JiraToDate" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Both dates are included, using local entry dates. Running entries are excluded. Each upload creates new Jira worklogs."
+                               Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,6,0,10" />
+                    <WrapPanel>
+                        <Button Content="Review entries" Command="{Binding ReviewCommand}" Margin="0,0,8,6" AutomationProperties.AutomationId="JiraReview" />
+                        <Button Content="Upload to Jira" Command="{Binding UploadCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,6" AutomationProperties.AutomationId="JiraUpload" />
+                        <Button Content="Stop after current entry" Command="{Binding StopCommand}" Margin="0,0,0,6" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Margin="0,4,0,8" AutomationProperties.AutomationId="JiraStatus" />
+                    <ProgressBar Minimum="0" Maximum="{Binding TotalCount}" Value="{Binding ProcessedCount}" Height="6" />
+                    <TextBlock Text="{Binding ErrorText}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.AutomationId="JiraError" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource SurfaceStyle}" Margin="0,12,0,0">
+                <Expander Header="Failed / not uploaded entries" IsExpanded="{Binding IsFailuresExpanded}">
+                <StackPanel>
+                    <Button Content="Copy failed entries" Click="OnCopyFailuresClick" IsEnabled="{Binding CanEdit}" HorizontalAlignment="Right" Margin="0,8,0,8" />
+                    <TextBox Text="{Binding FailedEntriesText, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" Height="120" AutomationProperties.AutomationId="JiraFailures" />
+                    <TextBlock Text="Failures stay here until the next upload or until this window closes. Copy them for manual logging."
+                               Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                </StackPanel>
+                </Expander>
+            </Border>
+            <Border Style="{StaticResource SurfaceStyle}" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="Upload history" FontWeight="SemiBold" />
+                    <TextBlock Text="Counts: uploaded / failed / not attempted. Latest entry means latest successfully uploaded entry in that batch."
+                               Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <ListView ItemsSource="{Binding History}" Height="180" ScrollViewer.HorizontalScrollBarVisibility="Auto" AutomationProperties.AutomationId="JiraHistory">
+                        <ListView.View><GridView>
+                            <GridViewColumn Header="Upload time" Width="145" DisplayMemberBinding="{Binding UploadedLocal, StringFormat='{}{0:g}'}" />
+                            <GridViewColumn Header="Selected date range" Width="210" DisplayMemberBinding="{Binding Range}" />
+                            <GridViewColumn Header="Counts" Width="90" DisplayMemberBinding="{Binding Counts}" />
+                            <GridViewColumn Header="Status" Width="180" DisplayMemberBinding="{Binding Status}" />
+                            <GridViewColumn Header="Latest entry" Width="165" DisplayMemberBinding="{Binding LastEntry}" />
+                            <GridViewColumn Header="Organization" Width="180" DisplayMemberBinding="{Binding Domain}" />
+                            <GridViewColumn Header="Account" Width="200" DisplayMemberBinding="{Binding Email}" />
+                        </GridView></ListView.View>
+                    </ListView>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="Daily logs are saved beside the database:" Style="{StaticResource MutedTextStyle}" Margin="0,12,0,4" />
+            <TextBox Text="{Binding LogDirectory, Mode=OneWay}" IsReadOnly="True" ToolTip="Select and copy the logging directory" />
+            <Button Content="Close" Click="OnCloseClick" IsEnabled="{Binding CanEdit}" HorizontalAlignment="Right" Margin="0,12,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

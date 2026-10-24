@@ -57,6 +57,11 @@ public sealed class TimeEntryRepository : ITimeEntryRepository, IScreenSessionEv
             await connection.ExecuteAsync(new CommandDefinition(migrationSql, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
+        if (version < 4)
+        {
+            await JiraUploadRepository.ApplyMigrationAsync(connection, cancellationToken).ConfigureAwait(false);
+        }
+
         const string effectiveDateIndexSql = """
             CREATE INDEX IF NOT EXISTS IX_TimeEntries_EffectiveUtc
             ON TimeEntries(COALESCE(StartUtc, EndUtc, CreatedUtc));
