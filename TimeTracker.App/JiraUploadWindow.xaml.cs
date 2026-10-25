@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Navigation;
 using TimeTracker.App.ViewModels;
 
 namespace TimeTracker.App;
@@ -54,6 +56,19 @@ public partial class JiraUploadWindow : Window
         if (string.IsNullOrWhiteSpace(ViewModel.FailedEntriesText)) return;
         try { Clipboard.SetText(ViewModel.FailedEntriesText); }
         catch (ExternalException) { ViewModel.ErrorText = "Clipboard is busy. Select the failed entries and copy them, or try again."; }
+    }
+
+    private void OnCreateTokenNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        {
+            ViewModel.ErrorText = "Could not open your browser. Go to https://id.atlassian.com/manage-profile/security/api-tokens to create your API token.";
+        }
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();

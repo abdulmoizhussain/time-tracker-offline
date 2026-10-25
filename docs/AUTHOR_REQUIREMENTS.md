@@ -889,6 +889,18 @@ Relationship: clarifies AR-048/049's ticket selection when a description contain
 
 Validation notes (agent observations): the existing `Regex.Match` searches left to right and returns the first match. The existing request test checks that `abc-123 review XYZ-999` produces exactly one request to `abc-123`, with the entire description preserved as the comment. No upload behavior change is needed; README now states the search direction explicitly.
 
+## AR-051 — Link to Jira token creation from upload settings
+
+Recorded: 2026-10-25 (Asia/Karachi). Source: author message in the current development conversation.
+
+Author's original request (verbatim):
+
+> we need to hyperlink and give a msg to the page where users can go and generate their Jira token.
+
+Relationship: extends AR-048/049's Jira connection settings and replacement-token workflow.
+
+Implementation notes (agent decisions): place a Create a Jira API token hyperlink and explanatory message beside the token field. Open Atlassian's official `https://id.atlassian.com/manage-profile/security/api-tokens` page in the default browser, without passing credentials. Ask users to sign in with the Jira email entered above, choose Create API token without scopes for the existing organization-domain API integration, then copy/paste the token and save. Verified the destination and token-type guidance against [Atlassian Support](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/). Show a fallback URL in the window if browser launch fails.
+
 ## Maintenance rules
 
 1. Append new author feature requirements and meaningful corrections as new entries with stable IDs (`AR-010`, `AR-011`, ...). Include source context and a recording date; claim an original message date only when known.

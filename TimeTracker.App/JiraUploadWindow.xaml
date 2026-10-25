@@ -25,6 +25,15 @@
                         <PasswordBox x:Name="TokenBox" PasswordChanged="OnTokenChanged" Padding="8,2" MinHeight="28"
                                      AutomationProperties.AutomationId="JiraToken" />
                         <TextBlock Text="{Binding TokenHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,8" />
+                        <TextBlock Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,4">
+                            <Run Text="Need a token? " /><Hyperlink x:Name="JiraTokenLink"
+                                NavigateUri="https://id.atlassian.com/manage-profile/security/api-tokens"
+                                RequestNavigate="OnCreateTokenNavigate"
+                                ToolTip="Open Atlassian's API token page in your default browser"
+                                AutomationProperties.AutomationId="JiraCreateTokenLink">Create a Jira API token</Hyperlink><Run Text=" (opens your browser)." />
+                        </TextBlock>
+                        <TextBlock Text="Sign in with the Jira email entered above. For this uploader, choose Create API token (without scopes), then copy the new token into the field above and save."
+                                   Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,8" />
                         <Button Content="Save connection settings" Command="{Binding SaveSettingsCommand}" HorizontalAlignment="Left"
                                 AutomationProperties.AutomationId="JiraSaveSettings" />
                     </StackPanel>
